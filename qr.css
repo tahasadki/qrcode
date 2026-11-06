@@ -1,0 +1,271 @@
+@import url("https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&display=swap");
+
+:root {
+  --brown-dark: #302018;
+  --brown: #513327;
+  --terracotta: #8f4934;
+  --gold: #c59a56;
+  --gold-light: #e5c995;
+  --cream: #f7edda;
+  --paper: #fffaf0;
+  --muted: #826b59;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background:
+    linear-gradient(
+      rgba(47, 29, 20, 0.65),
+      rgba(47, 29, 20, 0.65)
+    ),
+    url("https://images.unsplash.com/photo-1548013146-72479768bada?auto=format&fit=crop&w=1800&q=90")
+    center / cover fixed;
+
+  color: var(--brown-dark);
+  font-family: "Cairo", Arial, sans-serif;
+}
+
+.advertisement {
+  width: min(100%, 720px);
+
+  padding: 55px 40px;
+
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+
+  background:
+    linear-gradient(
+      rgba(255, 250, 240, 0.96),
+      rgba(247, 237, 218, 0.96)
+    );
+
+  box-shadow:
+    0 0 0 8px rgba(229, 201, 149, 0.3),
+    0 25px 70px rgba(0, 0, 0, 0.35);
+
+  text-align: center;
+}
+
+.small-label {
+  margin: 0 0 12px;
+
+  color: var(--terracotta);
+
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+h1 {
+  margin: 0;
+
+  color: var(--brown);
+
+  font-family: "Amiri", Georgia, serif;
+  font-size: clamp(38px, 6vw, 62px);
+  line-height: 1.25;
+}
+
+h1 strong {
+  display: block;
+  color: var(--terracotta);
+}
+
+.gold-line {
+  width: 90px;
+  height: 2px;
+  margin: 22px auto;
+
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--gold),
+    transparent
+  );
+}
+
+.description {
+  max-width: 520px;
+  margin: auto;
+
+  color: var(--muted);
+
+  font-size: 15px;
+  line-height: 2;
+}
+
+.advantages {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  margin: 24px 0 30px;
+
+  color: var(--terracotta);
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.advantages span {
+  padding: 7px 12px;
+
+  border: 1px solid var(--gold-light);
+  border-radius: 20px;
+
+  background: rgba(255, 250, 240, 0.7);
+}
+
+.qr-card {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+
+  max-width: 570px;
+  margin: auto;
+  padding: 20px;
+
+  border: 1px solid var(--gold-light);
+  border-radius: 6px;
+
+  background: rgba(255, 250, 240, 0.85);
+
+  box-shadow: 7px 7px 0 rgba(197, 154, 86, 0.3);
+
+  text-align: right;
+}
+
+.qr-code {
+  width: 190px;
+  height: 190px;
+
+  flex: 0 0 auto;
+
+  padding: 10px;
+
+  border: 6px solid white;
+
+  background: white;
+}
+
+.qr-text h2 {
+  margin: 0 0 10px;
+
+  color: var(--terracotta);
+
+  font-family: "Amiri", Georgia, serif;
+  font-size: 29px;
+}
+
+.qr-text p {
+  margin: 0 0 13px;
+
+  color: var(--muted);
+
+  font-size: 12px;
+  line-height: 2;
+}
+
+.qr-text span {
+  color: var(--brown);
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.visit-button {
+  display: inline-block;
+
+  margin-top: 30px;
+  padding: 14px 28px;
+
+  border-radius: 4px;
+
+  background: var(--terracotta);
+  color: white;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  box-shadow: 0 4px 0 #642c20;
+
+  transition:
+    transform 0.25s ease,
+    background 0.25s ease;
+}
+
+.visit-button:hover {
+  background: #713326;
+  transform: translateY(-3px);
+}
+
+.footer-text {
+  margin: 25px 0 0;
+
+  color: var(--gold);
+
+  font-family: "Amiri", Georgia, serif;
+  font-size: 17px;
+}
+
+/* الهاتف */
+
+@media (max-width: 600px) {
+  body {
+    padding: 14px;
+  }
+
+  .advertisement {
+    padding: 40px 20px;
+  }
+
+  .advantages {
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .qr-card {
+    align-items: center;
+    flex-direction: column;
+    gap: 16px;
+
+    padding: 16px;
+
+    text-align: center;
+  }
+
+  .qr-code {
+    width: 220px;
+    height: 220px;
+  }
+
+  .qr-text h2 {
+    font-size: 26px;
+  }
+
+  .qr-text p {
+    font-size: 11px;
+  }
+
+  .visit-button {
+    width: 100%;
+  }
+}
