@@ -517,3 +517,82 @@ img {
     transition: none !important;
   }
 }
+/* دعم الحركات ثلاثية الأبعاد في الهاتف */
+
+.hero-section,
+.qr-card,
+.service-card,
+.gallery-item,
+.primary-button,
+.secondary-button {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.hero-content {
+  animation: mobileHeroAnimation 1s ease both;
+  will-change: transform, opacity;
+}
+
+@keyframes mobileHeroAnimation {
+  from {
+    opacity: 0;
+    transform: translateY(35px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.service-card,
+.gallery-item,
+.qr-card {
+  transition:
+    transform 0.45s ease,
+    box-shadow 0.45s ease;
+}
+
+.service-card:hover,
+.gallery-item:hover,
+.qr-card:hover {
+  transform: perspective(900px) rotateY(-3deg) translateY(-7px);
+}
+
+/* الحركة في الهاتف */
+
+@media (max-width: 800px) {
+  .hero-section,
+  .about-section,
+  .services-section,
+  .gallery-section,
+  .booking-section {
+    animation: sectionAppear 0.8s ease both;
+  }
+
+  .service-card:active,
+  .gallery-item:active,
+  .qr-card:active {
+    transform: scale(0.97) translateY(-3px);
+  }
+
+  .primary-button:active,
+  .secondary-button:active,
+  .booking-button:active {
+    transform: scale(0.96);
+  }
+}
+
+@keyframes sectionAppear {
+  from {
+    opacity: 0;
+    transform: translateY(25px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

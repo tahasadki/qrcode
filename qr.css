@@ -269,3 +269,122 @@ h1 strong {
     width: 100%;
   }
 }
+/* ترتيب الموقع في الهاتف */
+
+@media (max-width: 800px) {
+
+  /* الصفحة الرئيسية */
+
+  .hero-section {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .hero-content {
+    order: 1;
+  }
+
+  .about-section {
+    display: flex;
+    flex-direction: column;
+    gap: 35px;
+  }
+
+  .about-text {
+    order: 1;
+  }
+
+  .about-image {
+    order: 2;
+    width: 100%;
+  }
+
+  .services-section {
+    order: 3;
+  }
+
+  .services-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .service-card {
+    width: 100%;
+  }
+
+  .gallery-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .gallery-item,
+  .gallery-large {
+    width: 100%;
+    height: 230px;
+  }
+
+  .booking-section {
+    order: 5;
+  }
+
+  /* الأزرار تظهر واحداً تحت الآخر */
+
+  .hero-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .hero-buttons a {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* إخفاء القائمة الطويلة في الهاتف */
+
+  .navigation {
+    display: none;
+  }
+
+  .site-header {
+    width: calc(100% - 30px);
+  }
+}
+body {
+  outline: 8px solid red !important;
+}
+@media screen and (max-width: 800px) {
+  .about-section {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .services-grid {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .gallery-grid {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .gallery-item,
+  .gallery-large {
+    width: 100% !important;
+    height: 230px !important;
+  }
+
+  .hero-buttons {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .hero-buttons a {
+    width: 100% !important;
+    text-align: center !important;
+  }
+}
