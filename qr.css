@@ -353,9 +353,11 @@ h1 strong {
     width: calc(100% - 30px);
   }
 }
+
 body {
   outline: 8px solid red !important;
 }
+
 @media screen and (max-width: 800px) {
   .about-section {
     display: flex !important;

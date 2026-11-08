@@ -1,247 +1,909 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
-
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
-  <meta
-    name="description"
-    content="تواصل مع فريق Qrcode"
-  >
-
-  <title>تواصل معنا - Qrcode</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Host – Riad Dar Nakhil</title>
   <link rel="stylesheet" href="./contact.css">
+  <style>
+    /* ══ نافذة المكالمة ══ */
+    .call-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .call-modal-overlay.open { display: flex; }
+
+    .call-modal {
+      background: #fffaf0;
+      border-radius: 16px;
+      padding: 28px 24px;
+      width: min(520px, 95vw);
+      box-shadow: 0 24px 60px rgba(0,0,0,.35);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      font-family: "Cairo", Arial, sans-serif;
+      animation: popIn .3s ease;
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(.92) translateY(20px); }
+      to   { opacity: 1; transform: scale(1)  translateY(0); }
+    }
+
+    .call-modal h2 {
+      margin: 0;
+      font-size: 20px;
+      color: #3e2b20;
+      text-align: center;
+    }
+    .call-modal .sub {
+      text-align: center;
+      font-size: 13px;
+      color: #765f50;
+      margin-top: -8px;
+    }
+
+    /* اختيار طريقة الاتصال */
+    .call-choices {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .call-choice-btn {
+      padding: 20px 10px;
+      border-radius: 10px;
+      border: 2px solid #d7c09a;
+      background: #fff;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color .2s, background .2s, transform .15s;
+      font-family: inherit;
+    }
+    .call-choice-btn:hover {
+      border-color: #bd914b;
+      background: #fdf5e6;
+      transform: translateY(-3px);
+    }
+    .call-choice-btn .choice-icon { font-size: 32px; display: block; margin-bottom: 8px; }
+    .call-choice-btn strong { font-size: 14px; color: #3e2b20; }
+    .call-choice-btn small  { display: block; font-size: 11px; color: #888; margin-top: 4px; }
+
+    /* اختيار اللغة */
+    .lang-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lang-row label { font-size: 13px; color: #555; white-space: nowrap; }
+    .lang-row select {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid #d7c09a;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      background: #fff;
+    }
+
+    /* منطقة الفيديو/الصوت */
+    .call-video-area {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .call-video-area.active { display: flex; }
+
+    .videos-row {
+      display: flex;
+      gap: 8px;
+    }
+    .videos-row video {
+      flex: 1;
+      max-height: 200px;
+      border-radius: 8px;
+      background: #111;
+      object-fit: cover;
+    }
+
+    /* شريط الترجمة الحية */
+    .translation-strip {
+      background: #f3e7d0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #3e2b20;
+      min-height: 40px;
+      direction: auto;
+    }
+    .translation-strip .label {
+      font-size: 10px;
+      color: #934936;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    /* حالة الاتصال */
+    .call-status {
+      text-align: center;
+      font-size: 13px;
+      color: #555;
+      min-height: 20px;
+    }
+    .call-status.ringing { color: #f9a825; font-weight: bold; }
+    .call-status.connected { color: #3d7a52; font-weight: bold; }
+    .call-status.ended { color: #963f35; }
+
+    /* أزرار التحكم */
+    .call-controls-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      display: none;
+    }
+    .call-controls-row.visible { display: flex; }
+    .ctrl-btn {
+      padding: 9px 18px;
+      border-radius: 6px;
+      border: 0;
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 13px;
+      transition: opacity .2s, transform .15s;
+    }
+    .ctrl-btn:hover { opacity: .85; transform: translateY(-1px); }
+    .btn-mute-t { background: #555; color: #fff; }
+    .btn-mute-t.on { background: #c0392b; }
+    .btn-end-t  { background: #963f35; color: #fff; }
+    .btn-trans-t { background: #8f4934; color: #fff; }
+    .btn-trans-t.on { background: #3d7a52; }
+
+    /* زر إغلاق */
+    .modal-close {
+      position: absolute;
+      top: 12px; left: 14px;
+      background: none; border: none;
+      font-size: 22px; cursor: pointer;
+      color: #aaa; line-height: 1;
+      transition: color .2s;
+    }
+    .modal-close:hover { color: #333; }
+
+    /* منطقة انتظار الرد */
+    .waiting-host {
+      text-align: center;
+      display: none;
+    }
+    .waiting-host.visible { display: block; }
+    .waiting-host .ring-anim {
+      font-size: 48px;
+      animation: ring .6s infinite alternate;
+      display: inline-block;
+    }
+    @keyframes ring {
+      from { transform: rotate(-15deg); }
+      to   { transform: rotate(15deg); }
+    }
+
+    /* ═══ تعديل أزرار الصفحة الحالية ═══ */
+    .contact-call-section {
+      text-align: center;
+      padding: 40px 20px;
+      background: #fffaf0;
+      border-radius: 12px;
+      margin: 30px auto;
+      max-width: 600px;
+      border: 1px solid #d7c09a;
+    }
+    .contact-call-section h2 {
+      color: #3e2b20;
+      margin-bottom: 10px;
+    }
+    .contact-call-section p {
+      color: #765f50;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .open-call-btn {
+      display: inline-block;
+      padding: 14px 32px;
+      background: #934936;
+      color: #fff;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      transition: background .2s, transform .15s;
+    }
+    .open-call-btn:hover { background: #682d22; transform: translateY(-2px); }
+  </style>
 </head>
 
 <body>
 
   <!-- شريط التنقل -->
   <header class="header">
-
-    <a href="./index.html" class="logo">
-      Qrcode
-    </a>
-
+    <a href="./qr.html" class="logo">رياض دار النخيل</a>
     <nav class="navigation">
-
-      <a href="./index.html">
-        الرئيسية
-      </a>
-
-      <a href="./index.html#translator">
-        المترجم
-      </a>
-
-      <a href="./index.html#about">
-        عن المنصة
-      </a>
-
-      <a href="./contact.html">
-        تواصل معنا
-      </a>
-
+      <a href="./qr.html">Home</a>
+      <a href="./qr.html#about">About</a>
+      <a href="./contact.html">Contact Host</a>
     </nav>
-
-    <a
-      href="./index.html#translator"
-      class="header-button"
-    >
-      ابدأ الآن
-    </a>
-
+    <a href="./contact.html" class="header-button">Call Host</a>
   </header>
 
   <main>
 
-    <!-- مقدمة صفحة التواصل -->
+    <!-- مقدمة -->
     <section class="contact-hero">
+      <p class="small-title">We're here for you</p>
+      <h1>Contact the Host</h1>
+      <p>Start a voice or video call directly with the host – translation happens automatically.</p>
+    </section>
 
-      <p class="small-title">
-        نحن هنا لمساعدتك
-      </p>
-
-      <h1>
-        تواصل معنا
-      </h1>
-
+    <!-- زر فتح نافذة المكالمة -->
+    <div class="contact-call-section section">
+      <h2>🏠 Talk to Your Host</h2>
       <p>
-        لديك سؤال أو اقتراح؟ أرسل لنا رسالتك،
-        وسنحاول الرد عليك في أقرب وقت.
+        Speak in your language — the host will hear you in Moroccan Arabic,
+        and you'll hear the host in your language automatically.
       </p>
-
-    </section>
-
-    <!-- محتوى صفحة التواصل -->
-    <section class="contact-section">
-
-      <!-- معلومات التواصل -->
-      <div class="contact-info">
-
-        <div class="contact-info-card">
-
-          <div class="contact-icon">
-            ✉
-          </div>
-
-          <h2>
-            البريد الإلكتروني
-          </h2>
-
-          <p>
-            يمكنك مراسلتنا عبر البريد الإلكتروني:
-          </p>
-
-          <a href="mailto:hello@qrcode.com">
-            hello@qrcode.com
-          </a>
-
-        </div>
-
-        <div class="contact-info-card">
-
-          <div class="contact-icon">
-            ?
-          </div>
-
-          <h2>
-            هل تحتاج إلى مساعدة؟
-          </h2>
-
-          <p>
-            اكتب لنا تفاصيل المشكلة أو الاقتراح،
-            وسنكون سعداء بمساعدتك.
-          </p>
-
-        </div>
-
-        <div class="contact-info-card">
-
-          <div class="contact-icon">
-            QR
-          </div>
-
-          <h2>
-            منصة Qrcode
-          </h2>
-
-          <p>
-            ترجمة سهلة، مشاركة أسرع،
-            وتجربة بسيطة للجميع.
-          </p>
-
-        </div>
-
-      </div>
-
-      <!-- نموذج التواصل -->
-      <div class="contact-form-card">
-
-        <h2>
-          أرسل لنا رسالة
-        </h2>
-
-        <p class="form-description">
-          املأ البيانات التالية وسنتواصل معك.
-        </p>
-
-        <form id="contactForm">
-
-          <div class="form-group">
-
-            <label for="name">
-              الاسم الكامل
-            </label>
-
-            <input
-              type="text"
-              id="name"
-              name="name"
-              placeholder="اكتب اسمك الكامل"
-              required
-            >
-
-          </div>
-
-          <div class="form-group">
-
-            <label for="email">
-              البريد الإلكتروني
-            </label>
-
-            <input
-              type="email"
-              id="email"
-              name="email"
-              placeholder="example@email.com"
-              required
-            >
-
-          </div>
-
-          <div class="form-group">
-
-            <label for="subject">
-              موضوع الرسالة
-            </label>
-
-            <input
-              type="text"
-              id="subject"
-              name="subject"
-              placeholder="ما موضوع رسالتك؟"
-              required
-            >
-
-          </div>
-
-          <div class="form-group">
-
-            <label for="message">
-              الرسالة
-            </label>
-
-            <textarea
-              id="message"
-              name="message"
-              placeholder="اكتب رسالتك هنا..."
-              required
-            ></textarea>
-
-          </div>
-
-          <button
-            type="submit"
-            class="contact-submit-button"
-          >
-            إرسال الرسالة
-          </button>
-
-          <p
-            id="formMessage"
-            class="form-message"
-          ></p>
-
-        </form>
-
-      </div>
-
-    </section>
+      <button class="open-call-btn" id="openCallModalBtn">
+        📞 Start a Call
+      </button>
+    </div>
 
   </main>
 
-  <!-- التذييل -->
   <footer class="footer">
-    Qrcode - منصة الترجمة
+    Riad Dar Nakhil &mdash; An authentic Moroccan experience
   </footer>
 
-  <script src="./contact.js"></script>
+
+  <!-- ════════════════════════════════════════
+       نافذة المكالمة
+  ════════════════════════════════════════ -->
+  <div class="call-modal-overlay" id="callModalOverlay" role="dialog" aria-modal="true">
+    <div class="call-modal">
+
+      <button class="modal-close" id="modalCloseBtn" aria-label="Close">×</button>
+
+      <!-- اختيار اللغة -->
+      <h2>Contact the Host</h2>
+      <p class="sub">Choose your language and call type</p>
+
+      <div class="lang-row">
+        <label for="myLang">My language:</label>
+        <select id="myLang">
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+          <option value="zh">中文</option>
+          <option value="ja">日本語</option>
+          <option value="ru">Русский</option>
+          <option value="pt">Português</option>
+          <option value="nl">Nederlands</option>
+          <option value="tr">Türkçe</option>
+        <option value="ar-MA">الدارجة المغربية (Darija)</option>
+        </select>
+      </div>
+
+      <!-- اختيار نوع المكالمة -->
+      <div class="call-choices" id="callChoices">
+        <button class="call-choice-btn" id="audioCallBtn">
+          <span class="choice-icon">📞</span>
+          <strong>Voice Call</strong>
+          <small>Audio only</small>
+        </button>
+        <button class="call-choice-btn" id="videoCallBtn">
+          <span class="choice-icon">📹</span>
+          <strong>Video Call</strong>
+          <small>Camera + Audio</small>
+        </button>
+      </div>
+
+      <!-- انتظار رد المضيف -->
+      <div class="waiting-host" id="waitingHost">
+        <div class="ring-anim">📳</div>
+        <p id="waitingText" style="margin-top:10px; color:#555;">Calling the host…</p>
+      </div>
+
+      <!-- حالة الاتصال -->
+      <div class="call-status" id="callStatus"></div>
+
+      <!-- منطقة الفيديو -->
+      <div class="call-video-area" id="callVideoArea">
+        <div class="videos-row">
+          <video id="myVideo"   autoplay muted   playsinline></video>
+          <video id="hostVideo" autoplay playsinline></video>
+        </div>
+      </div>
+
+      <!-- ما قاله المضيف (مترجم) -->
+      <div class="translation-strip" id="hostTranslationStrip" style="display:none;">
+        <div class="label">Host says:</div>
+        <div id="hostSpeechText">—</div>
+      </div>
+
+      <!-- ما قاله السائح (للتأكيد) -->
+      <div class="translation-strip" id="myTranslationStrip" style="display:none; background:#e7f3ea;">
+        <div class="label">You said (detected):</div>
+        <div id="mySpeechText">—</div>
+      </div>
+
+      <!-- صندوق كتابة للسائح -->
+      <div id="touristSpeechBox" style="display:none; gap:8px;">
+        <input type="text" id="touristInputText" placeholder="Type here in your language..." style="flex:1; padding:10px 12px; border-radius:6px; border:1px solid #d7c09a; font-family:inherit;">
+        <button id="touristSendBtn" style="background:#934936; color:#fff; border:none; padding:10px 16px; border-radius:6px; font-weight:bold; cursor:pointer; font-family:inherit;">Send 🚀</button>
+      </div>
+
+      <!-- أزرار التحكم -->
+      <div class="call-controls-row" id="callControlsRow">
+        <button class="ctrl-btn btn-mute-t" id="muteBtnT">🎤 Mute</button>
+        <button class="ctrl-btn btn-trans-t" id="toggleTransBtnT">🌐 Translation: OFF</button>
+        <button class="ctrl-btn btn-end-t"  id="endBtnT">End Call</button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <script>
+  "use strict";
+
+  /* ══════════════════════════════════════════
+     إعدادات
+  ══════════════════════════════════════════ */
+  const WS_URL = "ws://" + window.location.hostname + ":3000";
+  const ROOM   = "riad-room";
+  const ICE    = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ];
+
+  /* ══════════════════════════════════════════
+     DOM
+  ══════════════════════════════════════════ */
+  const overlay         = document.getElementById("callModalOverlay");
+  const openBtn         = document.getElementById("openCallModalBtn");
+  const modalCloseBtn   = document.getElementById("modalCloseBtn");
+  const callChoices     = document.getElementById("callChoices");
+  const audioCallBtn    = document.getElementById("audioCallBtn");
+  const videoCallBtn    = document.getElementById("videoCallBtn");
+  const myLangSel       = document.getElementById("myLang");
+  const waitingHost     = document.getElementById("waitingHost");
+  const waitingText     = document.getElementById("waitingText");
+  const callStatus      = document.getElementById("callStatus");
+  const callVideoArea   = document.getElementById("callVideoArea");
+  const myVideo         = document.getElementById("myVideo");
+  const hostVideo       = document.getElementById("hostVideo");
+  const hostTransStrip  = document.getElementById("hostTranslationStrip");
+  const hostSpeechText  = document.getElementById("hostSpeechText");
+  const myTransStrip    = document.getElementById("myTranslationStrip");
+  const mySpeechText    = document.getElementById("mySpeechText");
+  const callControlsRow = document.getElementById("callControlsRow");
+  const muteBtnT        = document.getElementById("muteBtnT");
+  const toggleTransBtnT = document.getElementById("toggleTransBtnT");
+  const endBtnT         = document.getElementById("endBtnT");
+
+  /* ══════════════════════════════════════════
+     الحالة
+  ══════════════════════════════════════════ */
+  let socket      = null;
+  let pc          = null;
+  let localStream = null;
+  let callMode    = null;
+  let inTouristCall = false;
+  let muted       = false;
+  let transActive = false;
+  let touristRecognition = null;
+  let hostLang    = "ar-MA";
+
+  /* ══════════════════════════════════════════
+     فتح/إغلاق النافذة
+  ══════════════════════════════════════════ */
+  openBtn.addEventListener("click", function () {
+    overlay.classList.add("open");
+    if (!socket || socket.readyState !== WebSocket.OPEN) connectWS();
+  });
+
+  modalCloseBtn.addEventListener("click", hangUp);
+
+  /* إغلاق بالنقر خارج النافذة */
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) hangUp();
+  });
+
+  /* ══════════════════════════════════════════
+     WebSocket
+  ══════════════════════════════════════════ */
+  function connectWS() {
+    socket = new WebSocket(WS_URL);
+
+    socket.addEventListener("open", function () {
+      socket.send(JSON.stringify({ type: "register", role: "tourist", room: ROOM }));
+    });
+
+    socket.addEventListener("message", async function (ev) {
+      const data = JSON.parse(ev.data);
+      await handleSignal(data);
+    });
+
+    socket.addEventListener("close", function () {
+      setStatus("", "Connection lost.");
+    });
+  }
+
+  function sendSignal(obj) {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(obj));
+    }
+  }
+
+  /* ══════════════════════════════════════════
+     إشارات WebRTC
+  ══════════════════════════════════════════ */
+  async function handleSignal(data) {
+    switch (data.type) {
+
+      case "call-accepted":
+        waitingHost.classList.remove("visible");
+        setStatus("connected", "✅ Connected! Starting call…");
+        await startWebRTC();
+        break;
+
+      case "call-rejected":
+        waitingHost.classList.remove("visible");
+        setStatus("ended", "The host is unavailable right now.");
+        callChoices.style.display = "grid";
+        break;
+
+      case "call-offer":
+        if (!pc) await setupPC();
+        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        const ans = await pc.createAnswer();
+        await pc.setLocalDescription(ans);
+        sendSignal({ type: "call-answer", sdp: ans });
+        onCallActive();
+        break;
+
+      case "call-answer":
+        if (pc) await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        onCallActive();
+        break;
+
+      case "ice-candidate":
+        if (pc && data.candidate) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (_) {}
+        }
+        break;
+
+      case "host-speech":
+        /* المضيف تكلم – اعرض الترجمة وانطقها للسائح */
+        onHostSpeech(data.text, data.translated, data.targetLang);
+        break;
+
+      case "tourist-speech":
+        break;  /* السائح لا يحتاج يعرض كلامه مرة ثانية */
+
+      case "call-ended":
+      case "tourist-left":
+        hangUp(false);
+        break;
+    }
+  }
+
+  /* ══════════════════════════════════════════
+     بدء المكالمة (من جانب السائح)
+  ══════════════════════════════════════════ */
+  audioCallBtn.addEventListener("click", function () { initiateCall("audio"); });
+  videoCallBtn.addEventListener("click", function () { initiateCall("video"); });
+
+  async function initiateCall(mode) {
+    callMode = mode;
+    callChoices.style.display = "none";
+    waitingHost.classList.add("visible");
+    waitingText.textContent = "Calling the host…";
+    setStatus("ringing", "");
+
+    /* أخبر المضيف بالمكالمة ومعها لغة السائح المختارة */
+    sendSignal({ 
+      type: "incoming-call", 
+      callMode: mode, 
+      touristLang: myLangSel.value 
+    });
+  }
+
+  function createTouristDummyStream() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320; canvas.height = 240;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#2d1a11";
+    ctx.fillRect(0, 0, 320, 240);
+    ctx.fillStyle = "#e8c88f";
+    ctx.font = "bold 20px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Tourist Guest", 160, 120);
+    const stream = canvas.captureStream ? canvas.captureStream(10) : new MediaStream();
+    try {
+      const actx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = actx.createOscillator();
+      const dst = actx.createMediaStreamDestination();
+      osc.connect(dst); osc.start();
+      const track = dst.stream.getAudioTracks()[0];
+      if (track) { track.enabled = false; stream.addTrack(track); }
+    } catch(e) {}
+    return stream;
+  }
+
+  async function getResilientStreamTourist(preferVideo) {
+    if (preferVideo) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      } catch(e1) {
+        console.warn("Failed audio+video, trying video only...", e1);
+        try {
+          return await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } catch(e2) {
+          console.warn("Failed video only...", e2);
+        }
+      }
+    }
+
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch(e3) {
+      console.warn("Media blocked, fallback to dummy stream...", e3);
+      return createTouristDummyStream();
+    }
+  }
+
+  /* إعداد WebRTC */
+  let setupPromise = null;
+  async function setupPC() {
+    if (pc) return pc;
+    if (setupPromise) return await setupPromise;
+
+    setupPromise = (async function () {
+      localStream = await getResilientStreamTourist(callMode === "video");
+
+      if (callMode === "video" && localStream.getVideoTracks().length > 0) {
+        myVideo.srcObject = localStream;
+      }
+
+      pc = new RTCPeerConnection({ iceServers: ICE });
+      localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+      pc.ontrack = function (ev) {
+        if (ev.streams && ev.streams[0]) {
+          hostVideo.srcObject = ev.streams[0];
+        }
+      };
+
+      pc.onicecandidate = function (ev) {
+        if (ev.candidate) {
+          sendSignal({ type: "ice-candidate", candidate: ev.candidate });
+        }
+      };
+
+      pc.oniceconnectionstatechange = function () {
+        console.log("Tourist ICE State:", pc.iceConnectionState);
+      };
+      return pc;
+    })();
+
+    try {
+      return await setupPromise;
+    } finally {
+      setupPromise = null;
+    }
+  }
+
+  function handleMediaError(e) {
+    let msg = "تعذر الوصول للميكروفون أو الكاميرا.";
+    if (e.name === "NotAllowedError" || e.name === "PermissionDeniedError") {
+      msg = "❌ تم رفض الإذن! يرجى الضغط على أيقونة القفل (🔒) بجانب عنوان الموقع في المتصفح وتفعيل الميكروفون والكاميرا، ثم تحديث الصفحة.";
+    } else if (e.name === "NotFoundError" || e.name === "DevicesNotFoundError") {
+      msg = "⚠️ لم يتم العثور على ميكروفون أو كاميرا متصلة بالجهاز.";
+    } else if (e.name === "NotReadableError" || e.name === "TrackStartError") {
+      msg = "⚠️ الميكروفون أو الكاميرا قيد الاستخدام من قِبل تطبيق آخر (مثل Zoom أو Teams). يرجى إغلاقه.";
+    }
+    alert(msg);
+    setStatus("ended", msg);
+  }
+
+  async function startWebRTC() {
+    await setupPC();
+  }
+
+  function onCallActive() {
+    inTouristCall = true;
+    setStatus("connected", "🟢 Call in progress");
+    if (callMode === "video") callVideoArea.classList.add("active");
+    hostTransStrip.style.display = "block";
+    myTransStrip.style.display   = "block";
+    document.getElementById("touristSpeechBox").style.display = "flex";
+    callControlsRow.classList.add("visible");
+    waitingHost.classList.remove("visible");
+
+    /* بدء التعرف على كلام السائح */
+    startTouristRecognition();
+  }
+
+  /* إرسال كلام السائح يدوياً أو صوتياً */
+  const touristInputText = document.getElementById("touristInputText");
+  const touristSendBtn   = document.getElementById("touristSendBtn");
+
+  async function sendTouristManualSpeech() {
+    const text = touristInputText.value.trim();
+    if (!text) return;
+    touristInputText.value = "";
+
+    mySpeechText.textContent = text;
+    const myLang = myLangSel.value;
+    const translated = await translateText(text, myLang, "ar");
+    sendSignal({ type: "tourist-speech", text, translated });
+  }
+
+  touristSendBtn.addEventListener("click", sendTouristManualSpeech);
+  touristInputText.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") sendTouristManualSpeech();
+  });
+
+  /* ══════════════════════════════════════════
+     التعرف على كلام السائح
+  ══════════════════════════════════════════ */
+  function startTouristRecognition() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+
+    const myLang = myLangSel.value;
+    const locale = langToLocale(myLang);
+
+    touristRecognition = new SR();
+    touristRecognition.lang            = locale;
+    touristRecognition.continuous      = true;
+    touristRecognition.interimResults  = true;
+
+    touristRecognition.onresult = async function (ev) {
+      let final = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        if (ev.results[i].isFinal) final += ev.results[i][0].transcript;
+      }
+      if (!final) return;
+
+      mySpeechText.textContent = final;
+
+      /* ترجمة للعربية لإرسالها للمضيف */
+      const translated = await translateText(final, myLang, "ar");
+
+      /* أرسل للمضيف */
+      sendSignal({ type: "tourist-speech", text: final, translated });
+    };
+
+    touristRecognition.onerror = function (e) {
+      if (e.error !== "no-speech") console.warn("SR:", e.error);
+    };
+
+    touristRecognition.onend = function () {
+      if (inTouristCall) {
+        setTimeout(function () {
+          if (inTouristCall) {
+            try { touristRecognition.start(); } catch (_) {}
+          }
+        }, 300);
+      }
+    };
+
+    try { touristRecognition.start(); } catch (_) {}
+  }
+
+  /* ══════════════════════════════════════════
+     ما قاله المضيف (مترجم)
+  ══════════════════════════════════════════ */
+  function onHostSpeech(original, translated, targetLang) {
+    hostSpeechText.textContent = translated || original;
+    /* انطق الترجمة للسائح */
+    speak(translated || original, langToLocale(myLangSel.value));
+  }
+
+  /* ══════════════════════════════════════════
+     الترجمة عبر الخادم مع دعم الدارجة
+  ══════════════════════════════════════════ */
+  async function translateText(text, from, to) {
+    if (!text || from === to) return text;
+    try {
+      const res  = await fetch(`/api/translate?text=${encodeURIComponent(text)}&from=${from}&to=${to}`);
+      const json = await res.json();
+      return json?.translated || text;
+    } catch {
+      try {
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+        const res  = await fetch(url);
+        const json = await res.json();
+        return json?.responseData?.translatedText || text;
+      } catch { return text; }
+    }
+  }
+
+  if (window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = function () {
+      window.speechSynthesis.getVoices();
+    };
+  }
+
+  function speak(text, locale) {
+    if (!window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = locale;
+    u.volume = 1;
+    u.rate = 1;
+    const voices = speechSynthesis.getVoices();
+    const v = voices.find(voice => voice.lang.startsWith(locale.slice(0, 2)));
+    if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  }
+
+  function langToLocale(l) {
+    const m = {
+      en:"en-US", fr:"fr-FR", es:"es-ES", de:"de-DE",
+      it:"it-IT", zh:"zh-CN", ja:"ja-JP", ru:"ru-RU",
+      pt:"pt-PT", nl:"nl-NL", tr:"tr-TR"
+    };
+    return m[l] || l;
+  }
+
+  /* ══════════════════════════════════════════
+     أزرار التحكم
+  ══════════════════════════════════════════ */
+  muteBtnT.addEventListener("click", function () {
+    if (!localStream) return;
+    muted = !muted;
+    localStream.getAudioTracks().forEach(t => (t.enabled = !muted));
+    muteBtnT.textContent = muted ? "🔇 Unmute" : "🎤 Mute";
+    muteBtnT.classList.toggle("on", muted);
+  });
+
+  endBtnT.addEventListener("click", function () { hangUp(true); });
+
+  /* ════════════════════════════════════════════
+     تفعيل/إيقاف الترجمة الفورية Direction (يوجد في السائح والمضيف)
+   ═════════════════════════════════════════════ */
+  toggleTransBtnT.addEventListener("click", function () {
+    transActive = !transActive;
+    toggleTransBtnT.textContent = transActive ? "🌐 Translation: ON" : "🌐 Translation: OFF";
+    toggleTransBtnT.classList.toggle("on", transActive);
+
+    // إذا تفعّل الترجمة وبدأ المكالمة، شغّل التعرف على الصوت
+    if (transActive && localStream) {
+      startTouristSpeechRecognition();
+    }
+  });
+
+  /* ════════════════════════════════════════════
+     التعرف على صوت السائح وترجمته إلى لغة المضيف (والعكس)
+   ═════════════════════════════════════════════ */
+  function startTouristSpeechRecognition() {
+    if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+      showToast("المتصفح لا يدعم التعرف على الصوت");
+      return;
+    }
+
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const myLang = myLangSel.value;          // لغة السائح (المتكلم)
+    const toLang = hostLang;                 // لغة المضيف (الهدف)
+
+    touristRecognition = new Recognition();
+    touristRecognition.lang = myLang === "ar-MA" ? "ar" : myLang;
+    touristRecognition.continuous = true;
+    touristRecognition.interimResults = true;
+
+    touristRecognition.onresult = async function (event) {
+      let finalText = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalText += event.results[i][0].transcript + " ";
+        }
+      }
+      if (!finalText.trim()) return;
+
+      // عرض ما قاله السائح
+      mySpeechText.textContent = finalText.trim();
+      myTransStrip.style.display = "block";
+
+      // ترجم النص إلى لغة المضيف
+      try {
+        const translated = await translateText(finalText.trim(), myLang, toLang);
+        hostSpeechText.textContent = translated;
+        hostTransStrip.style.display = "block";
+
+        // نطق الترجمة بصوت المضيف locale
+        speak(translated, langToLocale(toLang));
+      } catch (e) {
+        console.error("خطأ في الترجمة:", e);
+      }
+    };
+
+    touristRecognition.onerror = function (e) {
+      console.error("خطأ في التعرف على الصوت:", e.error);
+    };
+
+    touristRecognition.onend = function () {
+      if (transActive) {
+        // إعادة التشغيل للاستمرار في الاستماع
+        try { touristRecognition.start(); } catch (_) {}
+      }
+    };
+
+    try {
+      touristRecognition.start();
+    } catch (e) {
+      console.error("تعذر تشغيل التعرف على الصوت:", e);
+    }
+  }
+
+  function showToast(msg) {
+    // نافذة إشعار بسيطة
+    const toast = document.createElement("div");
+    toast.style.cssText = "position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:8px;z-index:9999;font-size:14px;";
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  }
+
+  /* ══════════════════════════════════════════
+     إنهاء المكالمة
+  ══════════════════════════════════════════ */
+  function hangUp(notify = true) {
+    inTouristCall = false;
+    if (notify) sendSignal({ type: "call-ended" });
+
+    if (touristRecognition) { try { touristRecognition.stop(); } catch(_){} touristRecognition = null; }
+    if (pc)              { pc.close(); pc = null; }
+    if (localStream)     { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+
+    myVideo.srcObject   = null;
+    hostVideo.srcObject = null;
+
+    callVideoArea.classList.remove("active");
+    hostTransStrip.style.display = "none";
+    myTransStrip.style.display   = "none";
+    document.getElementById("touristSpeechBox").style.display = "none";
+    callControlsRow.classList.remove("visible");
+    waitingHost.classList.remove("visible");
+    callChoices.style.display = "grid";
+
+    muted = false;
+    muteBtnT.textContent = "🎤 Mute";
+    muteBtnT.classList.remove("on");
+
+    setStatus("ended", "Call ended.");
+    speechSynthesis.cancel();
+
+    overlay.classList.remove("open");
+  }
+
+  /* ══════════════════════════════════════════
+     حالة
+  ══════════════════════════════════════════ */
+  function setStatus(state, text) {
+    callStatus.className = "call-status" + (state ? " " + state : "");
+    callStatus.textContent = text;
+  }
+
+  </script>
 
 </body>
-
 </html>

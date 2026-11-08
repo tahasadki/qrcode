@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>فحص الكاميرا والميكروفون</title>
+  <style>
+    body { font-family: sans-serif; padding: 30px; background: #fdfaf5; color: #333; text-align: center; }
+    .card { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    button { padding: 12px 24px; font-size: 16px; font-weight: bold; margin: 10px; cursor: pointer; border-radius: 6px; border: none; }
+    .btn-mic { background: #2b78e4; color: white; }
+    .btn-cam { background: #0f9d58; color: white; }
+    .btn-both { background: #673ab7; color: white; }
+    #log { margin-top: 20px; text-align: left; direction: ltr; background: #1e1e1e; color: #a9ffaf; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 14px; min-height: 120px; white-space: pre-wrap; }
+    video { width: 100%; max-height: 240px; background: black; border-radius: 8px; margin-top: 15px; display: none; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>🛠️ فحص الميكروفون والكاميرا المباشر</h2>
+  <p>اضغط على أحد الأزرار لاختبار ما إذا كان المتصفح يستطيع الوصول لجهازك:</p>
+
+  <div>
+    <button class="btn-mic" onclick="testMedia({ audio: true })">🎤 فحص الميكروفون فقط</button>
+    <button class="btn-cam" onclick="testMedia({ video: true })">📷 فحص الكاميرا فقط</button>
+    <button class="btn-both" onclick="testMedia({ audio: true, video: true })">📹 فحص الاثنين معاً</button>
+  </div>
+
+  <video id="vPreview" autoplay playsinline muted></video>
+
+  <div id="log">جاهز للفحص... اضغط على أحد الأزرار أعلاه.</div>
+</div>
+
+<script>
+const logEl = document.getElementById("log");
+const videoEl = document.getElementById("vPreview");
+let currentStream = null;
+
+function log(msg, type="info") {
+  const time = new Date().toLocaleTimeString();
+  logEl.textContent += `\n[${time}] ${msg}`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+async function testMedia(constraints) {
+  logEl.textContent = `بدء الفحص: ${JSON.stringify(constraints)}...`;
+  videoEl.style.display = "none";
+  if (currentStream) {
+    currentStream.getTracks().forEach(t => t.stop());
+    currentStream = null;
+  }
+
+  log(`Protocol: ${window.location.protocol}`);
+  log(`isSecureContext: ${window.isSecureContext}`);
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    log("❌ خطأ فادح: المتصفح لا يوفر navigator.mediaDevices.getUserMedia في هذا الرابط!", "error");
+    return;
+  }
+
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    log(`الأجهزة المتوفرة: ${devices.length}`);
+    devices.forEach(d => log(` - [${d.kind}] ${d.label || 'اسم غير مصرح بعد'} (id: ${d.deviceId.slice(0,8)}...)`));
+  } catch (err) {
+    log(`فشل إحصاء الأجهزة: ${err.message}`);
+  }
+
+  try {
+    log("جاري طلب الصلاحية من المتصفح (getUserMedia)...");
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    currentStream = stream;
+    log("✅ نجح الفحص! تم الوصول للجهاز بنجاح.");
+    
+    stream.getTracks().forEach(track => {
+      log(` - Track: ${track.kind} (${track.label}), enabled: ${track.enabled}, state: ${track.readyState}`);
+    });
+
+    if (constraints.video) {
+      videoEl.style.display = "block";
+      videoEl.srcObject = stream;
+    }
+  } catch (err) {
+    log(`❌ فشل! Error Name: ${err.name}`, "error");
+    log(`❌ Error Message: ${err.message}`, "error");
+    log(`❌ Stack: ${err.stack}`, "error");
+  }
+}
+</script>
+
+</body>
+</html>

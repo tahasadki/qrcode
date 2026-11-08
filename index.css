@@ -596,3 +596,37 @@ img {
     transform: translateY(0);
   }
 }
+#callPanel {
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 10px;
+  background: #302018;
+  color: white;
+}
+
+#callPanel video {
+  width: 48%;
+  min-height: 180px;
+  margin: 1%;
+  border-radius: 8px;
+  background: #111;
+  object-fit: cover;
+}
+
+#endCallButton {
+  display: block;
+  margin: 15px auto 0;
+  padding: 11px 20px;
+  border: 0;
+  border-radius: 5px;
+  background: #963f35;
+  color: white;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  #callPanel video {
+    width: 100%;
+    margin: 5px 0;
+  }
+}

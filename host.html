@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة المضيف – رياض دار النخيل</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Amiri:wght@400;700&display=swap");
+
+    :root {
+      --sand:       #f3e7d0;
+      --paper:      #fffaf0;
+      --brown:      #3e2b20;
+      --terra:      #934936;
+      --gold:       #bd914b;
+      --gold-light: #e1c795;
+      --green:      #3d7a52;
+      --red:        #963f35;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: var(--sand);
+      color: var(--brown);
+      font-family: "Cairo", Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ═══ رأس الصفحة ═══ */
+    header {
+      background: var(--brown);
+      color: #f3e7d0;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    header h1 {
+      font-family: "Amiri", serif;
+      font-size: 22px;
+      color: var(--gold-light);
+    }
+    .status-dot {
+      width: 11px; height: 11px;
+      border-radius: 50%;
+      background: #aaa;
+      display: inline-block;
+      margin-left: 8px;
+      transition: background .3s;
+    }
+    .status-dot.online  { background: #4caf50; }
+    .status-dot.ringing { background: #f9a825; animation: pulse .7s infinite alternate; }
+    .status-dot.in-call { background: #42a5f5; }
+
+    @keyframes pulse { to { opacity: .3; } }
+
+    #statusText { font-size: 13px; color: var(--gold-light); }
+
+    /* ═══ تخطيط رئيسي ═══ */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+    }
+
+    /* ═══ اللوحة الجانبية ═══ */
+    .sidebar {
+      background: var(--paper);
+      border-left: 1px solid var(--gold-light);
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+      max-height: calc(100vh - 60px);
+    }
+
+    .panel-title {
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      color: var(--terra);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    /* ══ إشعار المكالمة الواردة ══ */
+    #incomingCall {
+      display: none;
+      background: linear-gradient(135deg, #fff8dc, #fff3cd);
+      border: 2px solid #f9a825;
+      border-radius: 12px;
+      padding: 18px;
+      text-align: center;
+      animation: slideIn .4s cubic-bezier(.34,1.56,.64,1);
+      box-shadow: 0 8px 24px rgba(249,168,37,.25);
+    }
+    #incomingCall.visible { display: block; }
+
+    .ring-icon {
+      font-size: 40px;
+      display: block;
+      margin-bottom: 8px;
+      animation: ringShake .5s infinite alternate;
+    }
+    @keyframes ringShake {
+      from { transform: rotate(-15deg); }
+      to   { transform: rotate(15deg); }
+    }
+
+    #incomingCall h2 {
+      color: #7a5000;
+      margin-bottom: 6px;
+      font-size: 16px;
+    }
+    #callTypeLabel {
+      font-size: 12px;
+      color: #6b4c00;
+      margin-bottom: 14px;
+      display: block;
+    }
+    .call-actions { display: flex; gap: 10px; justify-content: center; }
+
+    /* ══ أزرار ══ */
+    button {
+      cursor: pointer; border: 0; border-radius: 6px;
+      font-family: inherit; font-weight: bold;
+      transition: opacity .2s, transform .15s;
+    }
+    button:hover { opacity: .88; transform: translateY(-1px); }
+    button:active { transform: scale(.96); }
+
+    .btn-accept { background: var(--green); color: #fff; padding: 10px 20px; font-size: 14px; }
+    .btn-reject { background: var(--red);   color: #fff; padding: 10px 20px; font-size: 14px; }
+    .btn-end    { background: var(--red);   color: #fff; padding: 9px 16px; width: 100%; font-size: 13px; }
+    .btn-mute   { background: #555; color: #fff; padding: 9px 14px; flex: 1; font-size: 13px; }
+    .btn-mute.active { background: #c0392b; }
+    .btn-trans { background: #8f4934; color: #fff; padding: 9px 14px; font-size: 13px; }
+    .btn-trans.on { background: #3d7a52; }
+
+    /* ══ لغة السائح ══ */
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--gold-light);
+      border-radius: 6px;
+      background: #fff;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--brown);
+    }
+
+    /* ══ مناطق النص ══ */
+    .translate-box {
+      background: #f9f3e8;
+      border: 1px solid var(--gold-light);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .translate-box label {
+      font-size: 10px;
+      color: var(--terra);
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .transcript-area {
+      background: #fff;
+      border: 1px solid #e5d9c4;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 13px;
+      line-height: 1.8;
+      min-height: 60px;
+      max-height: 90px;
+      overflow-y: auto;
+      color: #333;
+      direction: auto;
+    }
+
+    /* ══ منطقة الفيديو ══ */
+    .video-wrap {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .video-area {
+      background: #0d0d0d;
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 350px;
+    }
+    #remoteVideo {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+    #localVideo {
+      position: absolute;
+      bottom: 14px; right: 14px;
+      width: 150px; height: 100px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid var(--gold);
+      background: #000;
+      display: none;
+    }
+
+    .waiting-screen {
+      text-align: center;
+      color: #666;
+    }
+    .waiting-screen .big-icon { font-size: 56px; margin-bottom: 10px; }
+    .waiting-screen p { font-size: 14px; }
+
+    /* ══ ترجمة حية على الفيديو ══ */
+    .live-caption {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,.8));
+      padding: 20px 16px 12px;
+      color: #fff;
+      font-size: 15px;
+      min-height: 48px;
+      display: none;
+      direction: auto;
+    }
+
+    /* ══ شريط التحكم ══ */
+    .call-controls {
+      background: #1a1a1a;
+      padding: 12px 20px;
+      display: none;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+    }
+    .call-controls.visible { display: flex; }
+
+    /* ══ تاريخ المحادثة ══ */
+    .chat-log {
+      background: #fff;
+      border: 1px solid #e5d9c4;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 12px;
+      min-height: 80px;
+      max-height: 110px;
+      overflow-y: auto;
+      color: #444;
+    }
+    .chat-log .msg-host    { color: var(--terra); }
+    .chat-log .msg-tourist { color: var(--green); }
+    .chat-log .msg-time    { color: #aaa; font-size: 10px; margin-left: 4px; }
+
+    /* ══ توست إشعار ══ */
+    .toast {
+      position: fixed;
+      bottom: 20px; right: 20px;
+      background: var(--brown);
+      color: #f3e7d0;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.3);
+      z-index: 999;
+      animation: toastIn .3s ease;
+      display: none;
+    }
+    .toast.show { display: block; }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: scale(.85) translateY(-15px); }
+      to   { opacity: 1; transform: scale(1)   translateY(0); }
+    }
+
+    /* ══ استجابة ══ */
+    @media (max-width: 768px) {
+      main { grid-template-columns: 1fr; }
+      .sidebar { order: 2; border-left: none; border-top: 1px solid var(--gold-light); max-height: none; }
+      .video-wrap { order: 1; min-height: 220px; }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>🏠 رياض دار النخيل — لوحة المضيف</h1>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">جارٍ الاتصال...</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ══ لوحة جانبية ══ -->
+  <aside class="sidebar">
+
+    <!-- مكالمة واردة -->
+    <div>
+      <p class="panel-title">المكالمات</p>
+      <div id="incomingCall">
+        <span class="ring-icon">📳</span>
+        <h2>مكالمة واردة!</h2>
+        <span id="callTypeLabel">سائح يريد التواصل</span>
+        <div class="call-actions">
+          <button class="btn-accept" id="acceptBtn">✅ قبول</button>
+          <button class="btn-reject" id="rejectBtn">❌ رفض</button>
+        </div>
+      </div>
+      <p id="noCallMsg" style="font-size:12px;color:#999;margin-top:6px;">لا توجد مكالمات حالياً.</p>
+    </div>
+
+    <!-- لغة السائح -->
+    <div>
+      <p class="panel-title">لغة السائح</p>
+      <select id="touristLang">
+        <option value="en">🇬🇧 English</option>
+        <option value="fr">🇫🇷 Français</option>
+        <option value="es">🇪🇸 Español</option>
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="it">🇮🇹 Italiano</option>
+        <option value="zh">🇨🇳 中文</option>
+        <option value="ja">🇯🇵 日本語</option>
+        <option value="ru">🇷🇺 Русский</option>
+        <option value="pt">🇵🇹 Português</option>
+        <option value="nl">🇳🇱 Nederlands</option>
+        <option value="tr">🇹🇷 Türkçe</option>
+        <option value="ar">🇲🇦 العربية</option>
+        <option value="ar-MA">🇲🇦 الدارجة المغربية (Darija)</option>
+      </select>
+    </div>
+
+    <!-- لغة المضيف (ما يتكلم به) -->
+    <div>
+      <p class="panel-title">لغة المضيف</p>
+      <select id="hostLang">
+        <option value="ar-MA">🇲🇦 الدارجة المغربية (Darija)</option>
+        <option value="en">🇬🇧 English</option>
+        <option value="fr">🇫🇷 Français</option>
+        <option value="es">🇪🇸 Español</option>
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="it">🇮🇹 Italiano</option>
+        <option value="zh">🇨🇳 中文</option>
+        <option value="ja">🇯🇵 日本語</option>
+        <option value="ru">🇷🇺 Русский</option>
+        <option value="pt">🇵🇹 Português</option>
+        <option value="nl">🇳🇱 Nederlands</option>
+        <option value="tr">🇹🇷 Türkçe</option>
+        <option value="ar">🇲🇦 العربية</option>
+      </select>
+    </div>
+
+    <!-- ما قاله المضيف -->
+    <div class="translate-box">
+      <label>🎙️ كلامك (دارجة)</label>
+      <div class="transcript-area" id="hostOriginal">—</div>
+    </div>
+    <div class="translate-box">
+      <label>🌐 ترجمتك للسائح</label>
+      <div class="transcript-area" id="hostTranslated">—</div>
+    </div>
+
+    <!-- ما قاله السائح -->
+    <div class="translate-box">
+      <label>👤 كلام السائح (مترجم)</label>
+      <div class="transcript-area" id="touristTranslated" style="color:#888;">في انتظار رسالة السائح...</div>
+    </div>
+
+    <!-- سجل المحادثة -->
+    <div>
+      <p class="panel-title">سجل المحادثة</p>
+      <div class="chat-log" id="chatLog"></div>
+    </div>
+
+  </aside>
+
+  <!-- ══ منطقة الفيديو ══ -->
+  <div class="video-wrap">
+
+    <div class="video-area" id="videoArea">
+      <div class="waiting-screen" id="waitingScreen">
+        <div class="big-icon">🏠</div>
+        <p>في انتظار مكالمة السائح…</p>
+        <p style="font-size:12px;color:#888;margin-top:6px;">ستصلك إشعارات بمجرد الاتصال</p>
+      </div>
+      <video id="remoteVideo" autoplay playsinline></video>
+      <video id="localVideo"  autoplay muted playsinline></video>
+      <div class="live-caption" id="liveCaption"></div>
+    </div>
+
+    <!-- شريط التحكم -->
+    <div class="call-controls" id="callControls">
+      <button class="btn-mute" id="muteBtn">🎤 كتم</button>
+      <button class="btn-trans" id="toggleTransBtn">🌐 ترجمة: OFF</button>
+      <button class="btn-end"  id="endBtn" style="max-width:150px;">📵 إنهاء</button>
+    </div>
+
+    <!-- صندوق الكلام بالدارجة (مباشر أو كتابي) -->
+    <div id="speechInputRow" style="display:none; padding:10px 16px; background:#241912; display:flex; gap:8px;">
+      <input type="text" id="manualSpeechInput" placeholder="اكتب هنا بالدارجة واضغط إرسال (سيسمعها السائح بلغته فوراً)..." style="flex:1; padding:10px 14px; border-radius:6px; border:1px solid var(--gold); font-size:14px; font-family:inherit; direction:rtl;">
+      <button id="sendSpeechBtn" style="background:var(--gold); color:#2f1d11; padding:10px 20px; font-weight:bold; border-radius:6px; font-size:14px;">إرسال 🚀</button>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- توست -->
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════
+   إعدادات
+══════════════════════════════════════════ */
+const ROOM = "riad-room";
+const ICE  = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun2.l.google.com:19302" }
+];
+
+/* ══════════════════════════════════════════
+   DOM
+══════════════════════════════════════════ */
+const statusDot      = document.getElementById("statusDot");
+const statusText     = document.getElementById("statusText");
+const incomingCall   = document.getElementById("incomingCall");
+const noCallMsg      = document.getElementById("noCallMsg");
+const callTypeLabel  = document.getElementById("callTypeLabel");
+const acceptBtn      = document.getElementById("acceptBtn");
+const rejectBtn      = document.getElementById("rejectBtn");
+const touristLangSel = document.getElementById("touristLang");
+const hostLangSel    = document.getElementById("hostLang");
+const hostLangSel    = document.getElementById("hostLang");
+const hostOrigEl     = document.getElementById("hostOriginal");
+const hostTransEl    = document.getElementById("hostTranslated");
+const touristTransEl = document.getElementById("touristTranslated");
+const chatLog        = document.getElementById("chatLog");
+const waitingScreen  = document.getElementById("waitingScreen");
+const remoteVideo    = document.getElementById("remoteVideo");
+const localVideo     = document.getElementById("localVideo");
+const liveCaption    = document.getElementById("liveCaption");
+const callControls   = document.getElementById("callControls");
+const toggleTransBtn = document.getElementById("toggleTransBtn");
+const muteBtn        = document.getElementById("muteBtn");
+const endBtn         = document.getElementById("endBtn");
+const toastEl        = document.getElementById("toast");
+
+/* ══════════════════════════════════════════
+   الحالة
+══════════════════════════════════════════ */
+let pc          = null;
+let localStream = null;
+let callMode    = null;
+let inCall      = false;
+let transActive = false;
+let hostLang    = "ar-MA";
+let muted       = false;
+let hostRec     = null;
+let ringAudio   = null;
+
+/* ══════════════════════════════════════════
+   WebSocket مع إعادة اتصال تلقائية
+══════════════════════════════════════════ */
+let socket;
+let wsRetry = 0;
+
+function connectWS() {
+  const wsUrl = "ws://" + window.location.hostname + ":3000";
+  socket = new WebSocket(wsUrl);
+
+  socket.addEventListener("open", function () {
+    wsRetry = 0;
+    socket.send(JSON.stringify({ type: "register", role: "host", room: ROOM }));
+    setStatus("online", "✅ متصل — في انتظار المكالمات");
+  });
+
+  socket.addEventListener("close", function () {
+    setStatus("", "⚠️ انقطع الاتصال — إعادة المحاولة…");
+    const delay = Math.min(1000 * Math.pow(2, wsRetry++), 15000);
+    setTimeout(connectWS, delay);
+  });
+
+  socket.addEventListener("error", function () {
+    setStatus("", "❌ لا يمكن الوصول للخادم");
+  });
+
+  socket.addEventListener("message", async function (ev) {
+    const data = JSON.parse(ev.data);
+    console.log("[Host WS] Received:", data.type, "| senderRole:", data.senderRole);
+    await handleSignal(data);
+  });
+}
+
+function sendSignal(obj) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(obj));
+  }
+}
+
+/* ══════════════════════════════════════════
+   معالجة الإشارات
+══════════════════════════════════════════ */
+async function handleSignal(data) {
+  switch (data.type) {
+
+    case "incoming-call":
+      callMode = data.callMode || "audio";
+      if (data.touristLang) {
+        touristLangSel.value = data.touristLang;
+      }
+      callTypeLabel.textContent =
+        callMode === "video" ? "📹 مكالمة فيديو" : "📞 مكالمة صوتية";
+      incomingCall.classList.add("visible");
+      noCallMsg.style.display = "none";
+      setStatus("ringing", "📳 مكالمة واردة…");
+      startRinging();
+      showToast("📳 مكالمة واردة من سائح!");
+      break;
+
+    case "call-offer":
+      if (!pc) break;
+      await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      sendSignal({ type: "call-answer", sdp: answer });
+      break;
+
+    case "call-answer":
+      if (pc) await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+      break;
+
+    case "ice-candidate":
+      if (pc && data.candidate) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (_) {}
+      }
+      break;
+
+    case "tourist-speech":
+      onTouristSpeech(data.text, data.translated);
+      break;
+
+    case "call-rejected":
+    case "call-ended":
+    case "tourist-left":
+      cleanUp();
+      showToast("📵 انتهت المكالمة");
+      break;
+  }
+}
+
+/* ══════════════════════════════════════════
+   قبول / رفض
+══════════════════════════════════════════ */
+acceptBtn.addEventListener("click", async function () {
+  stopRinging();
+  incomingCall.classList.remove("visible");
+  setStatus("in-call", "🔵 المكالمة جارية");
+  await startCall();
+  sendSignal({ type: "call-accepted", callMode });
+});
+
+rejectBtn.addEventListener("click", function () {
+  stopRinging();
+  sendSignal({ type: "call-rejected" });
+  incomingCall.classList.remove("visible");
+  noCallMsg.style.display = "";
+  setStatus("online", "✅ متصل — في انتظار المكالمات");
+});
+
+function createDummyStream() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 320; canvas.height = 240;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#3e2b20";
+  ctx.fillRect(0, 0, 320, 240);
+  ctx.fillStyle = "#e1c795";
+  ctx.font = "bold 22px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("رياض دار النخيل", 160, 120);
+  const stream = canvas.captureStream ? canvas.captureStream(10) : new MediaStream();
+  try {
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = actx.createOscillator();
+    const dst = actx.createMediaStreamDestination();
+    osc.connect(dst); osc.start();
+    const track = dst.stream.getAudioTracks()[0];
+    if (track) { track.enabled = false; stream.addTrack(track); }
+  } catch(e) {}
+  return stream;
+}
+
+async function getResilientStream(preferVideo) {
+  if (preferVideo) {
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    } catch(e1) {
+      console.warn("تعذر الصوت والفيديو معاً، جاري تجربة الفيديو فقط...", e1);
+      try {
+        const vStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        showToast("📹 تم تشغيل الكاميرا بنجاح (المايكروفون مغلق بالنظام)");
+        return vStream;
+      } catch(e2) {
+        console.warn("تعذر الفيديو أيضاً...", e2);
+      }
+    }
+  }
+
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch(e3) {
+    console.warn("الميكروفون محظور، جاري تشغيل الاتصال الافتراضي المرن...", e3);
+    showToast("⚠️ تم تشغيل الاتصال الافتراضي (يمكنك الكتابة بالدارجة والسائح سيسمعك)");
+    return createDummyStream();
+  }
+}
+
+/* ══════════════════════════════════════════
+   بدء المكالمة
+══════════════════════════════════════════ */
+async function startCall() {
+  inCall = true;
+  localStream = await getResilientStream(callMode === "video");
+
+  waitingScreen.style.display = "none";
+  callControls.classList.add("visible");
+  document.getElementById("speechInputRow").style.display = "flex";
+  liveCaption.style.display = "block";
+
+  if (callMode === "video" && localStream.getVideoTracks().length > 0) {
+    localVideo.style.display  = "block";
+    remoteVideo.style.display = "block";
+    localVideo.srcObject = localStream;
+  }
+
+  /* RTCPeerConnection */
+  pc = new RTCPeerConnection({ iceServers: ICE });
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+
+  pc.ontrack = function (ev) {
+    if (ev.streams && ev.streams[0]) {
+      remoteVideo.srcObject = ev.streams[0];
+      remoteVideo.style.display = "block";
+    }
+  };
+
+  pc.onicecandidate = function (ev) {
+    if (ev.candidate) sendSignal({ type: "ice-candidate", candidate: ev.candidate });
+  };
+
+  pc.oniceconnectionstatechange = function () {
+    console.log("ICE Connection State:", pc.iceConnectionState);
+    if (pc.iceConnectionState === "failed") {
+      console.warn("ICE connection failed, but keeping session active for chat & audio.");
+    }
+  };
+
+  /* المضيف يبدأ العرض */
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  sendSignal({ type: "call-offer", sdp: offer, callMode });
+
+  startHostRecognition();
+}
+
+/* ══════════════════════════════════════════
+   التعرف على كلام المضيف
+══════════════════════════════════════════ */
+function showMediaError(e) {
+  let msg = "تعذر الوصول للميكروفون أو الكاميرا.";
+  if (e.name === "NotAllowedError" || e.name === "PermissionDeniedError") {
+    msg = "❌ تم رفض الإذن! اضغط على أيقونة الإعدادات/القفل بجانب الرابط وفعل الميكروفون.";
+  } else if (e.name === "NotFoundError" || e.name === "DevicesNotFoundError") {
+    msg = "⚠️ لا يوجد ميكروفون متصل بهذا الحاسوب.";
+  } else if (e.name === "NotReadableError" || e.name === "TrackStartError") {
+    msg = "⚠️ الميكروفون مستعمل من طرف تطبيق آخر (WhatsApp/Zoom/Teams). أوقفه أولاً.";
+  }
+  alert(msg);
+  showToast(msg);
+}
+
+function startHostRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showToast("⚠️ المتصفح لا يدعم التعرف على الصوت"); return; }
+
+  hostRec = new SR();
+  hostRec.lang = hostLang === "ar-MA" ? "ar" : hostLang;
+  hostRec.continuous     = true;
+  hostRec.interimResults = true;
+
+  let debounce = null;
+
+  hostRec.onresult = async function (ev) {
+    let interim = "", final = "";
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      ev.results[i].isFinal
+        ? (final   += ev.results[i][0].transcript)
+        : (interim += ev.results[i][0].transcript);
+    }
+
+    hostOrigEl.textContent = final || interim;
+
+    if (final) {
+      clearTimeout(debounce);
+      debounce = setTimeout(async function () {
+        const fromLang = hostLang === "ar-MA" ? "ar" : hostLang;
+        const toLang   = touristLangSel.value;
+        const translated = await translate(final, fromLang, toLang);
+        hostTransEl.textContent = translated;
+        liveCaption.textContent = translated;
+        addToChat("host", final, translated);
+
+        sendSignal({ type: "host-speech", text: final, translated, targetLang: toLang });
+        speak(translated, langToLocale(toLang));
+      }, 300);
+    }
+  };
+
+  hostRec.onerror = function (e) {
+    if (e.error !== "no-speech") console.warn("SR:", e.error);
+  };
+
+  hostRec.onend = function () {
+    if (inCall) {
+      setTimeout(function () {
+        if (inCall) {
+          try { hostRec.start(); } catch (_) {}
+        }
+      }, 300);
+    }
+  };
+
+  try { hostRec.start(); } catch (_) {}
+}
+
+/* ══════════════════════════════════════════
+   كلام السائح
+══════════════════════════════════════════ */
+function onTouristSpeech(original, translated) {
+  const speechText = translated || original;
+  touristTransEl.style.color = "#222";
+  touristTransEl.textContent = speechText;
+  liveCaption.textContent    = "السائح: " + speechText;
+  addToChat("tourist", original, translated);
+  speak(speechText, langToLocale(hostLang));
+}
+
+/* ══════════════════════════════════════════
+   إرسال الكلام بالدارجة يدوياً أو صوتياً
+══════════════════════════════════════════ */
+const manualSpeechInput = document.getElementById("manualSpeechInput");
+const sendSpeechBtn     = document.getElementById("sendSpeechBtn");
+
+async function sendManualSpeech() {
+  const text = manualSpeechInput.value.trim();
+  if (!text) return;
+  manualSpeechInput.value = "";
+
+  hostOrigEl.textContent = text;
+  const fromLang = hostLang === "ar-MA" ? "ar" : hostLang;
+  const toLang   = touristLangSel.value;
+  const translated = await translate(text, fromLang, toLang);
+  hostTransEl.textContent = translated;
+  liveCaption.textContent = translated;
+  addToChat("host", text, translated);
+
+  sendSignal({ type: "host-speech", text: text, translated, targetLang: toLang });
+  speak(translated, langToLocale(toLang));
+}
+
+sendSpeechBtn.addEventListener("click", sendManualSpeech);
+manualSpeechInput.addEventListener("keydown", function(e) {
+  if (e.key === "Enter") sendManualSpeech();
+});
+
+/* ══════════════════════════════════════════
+   سجل المحادثة
+══════════════════════════════════════════ */
+function addToChat(who, original, translated) {
+  const time = new Date().toLocaleTimeString("ar-MA", { hour: "2-digit", minute: "2-digit" });
+  const div  = document.createElement("div");
+  div.className = "msg-" + who;
+  div.innerHTML = `<span class="msg-time">${time}</span>
+    <strong>${who === "host" ? "أنت" : "السائح"}:</strong>
+    ${translated || original}`;
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+/* ══════════════════════════════════════════
+   الترجمة عبر الخادم مع دعم الدارجة المغربية
+══════════════════════════════════════════ */
+async function translate(text, from, to) {
+  if (!text) return "";
+  // إذا لم يتم تحديد اللغة المستهدفة، نترجم للإنجليزية تلقائياً
+  if (!to) to = "en";
+
+  try {
+    const res  = await fetch(`/api/translate?text=${encodeURIComponent(text)}&from=${from}&to=${to}`);
+    const json = await res.json();
+    return json?.translated || text;
+  } catch {
+    try {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+      const res  = await fetch(url);
+      const json = await res.json();
+      return json?.responseData?.translatedText || text;
+    } catch { return text; }
+  }
+}
+
+/* ══════════════════════════════════════════
+   تحويل النص لصوت
+══════════════════════════════════════════ */
+if (window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = function () {
+    window.speechSynthesis.getVoices();
+  };
+}
+
+function speak(text, locale) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u  = new SpeechSynthesisUtterance(text);
+  u.lang   = locale;
+  u.volume = 1;
+  u.rate   = 1;
+  const voices = speechSynthesis.getVoices();
+  const v = voices.find(voice => voice.lang.startsWith(locale.slice(0, 2)));
+  if (v) u.voice = v;
+  speechSynthesis.speak(u);
+}
+
+function langToLocale(l) {
+  return {
+    en:"en-US", fr:"fr-FR", es:"es-ES", de:"de-DE",
+    it:"it-IT", zh:"zh-CN", ja:"ja-JP", ru:"ru-RU",
+    pt:"pt-PT", nl:"nl-NL", tr:"tr-TR", ar:"ar-MA"
+  }[l] || l;
+}
+
+/* ══════════════════════════════════════════
+   رنين المكالمة
+══════════════════════════════════════════ */
+function startRinging() {
+  if (ringAudio) return;
+  const ctx    = new (window.AudioContext || window.webkitAudioContext)();
+  let interval = setInterval(function () {
+    const osc = ctx.createOscillator();
+    const gain= ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + .4);
+    osc.start(); osc.stop(ctx.currentTime + .4);
+  }, 1200);
+  ringAudio = { ctx, interval };
+}
+
+function stopRinging() {
+  if (!ringAudio) return;
+  clearInterval(ringAudio.interval);
+  ringAudio.ctx.close();
+  ringAudio = null;
+}
+
+/* ══════════════════════════════════════════
+   أزرار التحكم
+══════════════════════════════════════════ */
+muteBtn.addEventListener("click", function () {
+  if (!localStream) return;
+  muted = !muted;
+  localStream.getAudioTracks().forEach(t => (t.enabled = !muted));
+  muteBtn.textContent = muted ? "🔇 رفع الكتم" : "🎤 كتم";
+  muteBtn.classList.toggle("active", muted);
+});
+
+toggleTransBtn.addEventListener("click", function () {
+  transActive = !transActive;
+  toggleTransBtn.textContent = transActive ? "🌐 ترجمة: ON" : "🌐 ترجمة: OFF";
+  toggleTransBtn.classList.toggle("on", transActive);
+
+  if (transActive && localStream) {
+    if (hostRec) { try { hostRec.stop(); } catch (_) {} hostRec = null; }
+    startHostRecognition();
+  } else if (!transActive && hostRec) {
+    try { hostRec.stop(); } catch (_) {} hostRec = null;
+  }
+});
+
+endBtn.addEventListener("click", function () {
+  sendSignal({ type: "call-ended" });
+  cleanUp();
+});
+
+/* ══════════════════════════════════════════
+   تنظيف
+══════════════════════════════════════════ */
+function cleanUp() {
+  inCall = false;
+  stopRinging();
+  if (hostRec)     { try { hostRec.stop(); } catch (_) {} hostRec = null; }
+  if (pc)          { pc.close(); pc = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+
+  remoteVideo.srcObject = null;
+  localVideo.srcObject  = null;
+  remoteVideo.style.display = "none";
+  localVideo.style.display  = "none";
+
+  waitingScreen.style.display = "block";
+  liveCaption.style.display   = "none";
+  callControls.classList.remove("visible");
+  document.getElementById("speechInputRow").style.display = "none";
+  incomingCall.classList.remove("visible");
+  noCallMsg.style.display = "";
+
+  muted = false;
+  muteBtn.textContent = "🎤 كتم";
+  muteBtn.classList.remove("active");
+
+  setStatus("online", "✅ متصل — في انتظار المكالمات");
+  speechSynthesis.cancel();
+  hostOrigEl.textContent = hostTransEl.textContent = "—";
+  touristTransEl.style.color = "#888";
+  touristTransEl.textContent = "في انتظار رسالة السائح...";
+  liveCaption.textContent = "";
+}
+
+/* ══════════════════════════════════════════
+   مساعدات UI
+══════════════════════════════════════════ */
+function setStatus(state, text) {
+  statusDot.className = "status-dot" + (state ? " " + state : "");
+  statusText.textContent = text;
+}
+
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  setTimeout(function () { toastEl.classList.remove("show"); }, 3500);
+}
+
+/* ══════════════════════════════════════════
+   تشغيل
+══════════════════════════════════════════ */
+connectWS();
+</script>
+
+</body>
+</html>

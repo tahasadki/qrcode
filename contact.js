@@ -94,3 +94,7 @@ document.addEventListener("DOMContentLoaded", function () {
     formMessage.style.color = "#16a34a";
   }
 });
+normalCallButton.addEventListener("click", function () {
+  videoMessage.textContent =
+    "سيتم فتح الاتصال داخل المنصة قريباً.";
+});
