@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, collection, addDoc, deleteDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, collection, addDoc, deleteDoc, serverTimestamp, getDocs, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Load Firebase config from firebase-config.js
 const firebaseConfig = window.__FIREBASE_CONFIG__ || {
@@ -39,12 +39,13 @@ let roomId = null;
 let pc = null;
 let localStream = null;
 let remoteStream = null;
-let isInitiator = false;
 let isConnected = false;
 let unsubRoom = null;
 let unsubCandidates = null;
 let muted = false;
 let cameraOff = false;
+let hasSentOffer = false;
+let hasReceivedOffer = false;
 
 // ICE Servers
 const ICE_SERVERS = [
@@ -118,24 +119,38 @@ async function joinRoom() {
 
   if (!roomSnap.exists()) {
     // First participant - create room
-    isInitiator = true;
     await setDoc(roomRef, {
       status: 'waiting',
-      initiator: 'local',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-    updateStatus('waiting', 'في انتظار انضمام الطرف الآخر…');
+    updateStatus('waiting', 'في انتظار الطرف الآخر…');
   } else {
-    // Room exists - join as second participant
-    isInitiator = false;
+    // Room exists
     const data = roomSnap.data();
     if (data.status === 'ended') {
-      showToast('انتهت هذه المكالمة');
-      return;
+      // Room was ended, reset it for new call
+      await updateDoc(roomRef, {
+        status: 'waiting',
+        offer: null,
+        answer: null,
+        updatedAt: serverTimestamp()
+      });
+      // Clear old candidates
+      const candidatesRef = collection(db, 'rooms', roomId, 'candidates');
+      const candidatesSnap = await getDocs(candidatesRef);
+      const deletePromises = candidatesSnap.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises).catch(() => {});
     }
-    await updateDoc(roomRef, { status: 'connecting', updatedAt: serverTimestamp() });
-    updateStatus('connecting', 'جاري الاتصال…');
+    // Check if there's an offer already
+    if (data.offer && !hasReceivedOffer) {
+      hasReceivedOffer = true;
+      await handleOffer(data.offer);
+    }
+    // If room is waiting but no offer yet, we'll wait for it via snapshot
+    if (data.status === 'waiting' && !data.offer) {
+      updateStatus('waiting', 'في انتظار الطرف الآخر…');
+    }
   }
 
   // Listen for room changes
@@ -151,6 +166,30 @@ async function joinRoom() {
       return;
     }
 
+    // Handle room reset to waiting (other party left)
+    if (data.status === 'waiting' && isConnected) {
+      // Other party left, reset our state to allow new connection
+      isConnected = false;
+      hasReceivedOffer = false;
+      hasSentOffer = false;
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+      remoteVideo.style.display = 'none';
+      remoteWaiting.style.display = 'block';
+      callControls.style.display = 'none';
+      preCallControls.style.display = 'flex';
+      captionArea.classList.remove('visible');
+      updateStatus('waiting', 'في انتظار الطرف الآخر…');
+      
+      // Try to create new offer if none exists
+      if (!data.offer && !hasSentOffer) {
+        await createAndSendOfferAtomic();
+      }
+      return;
+    }
+
     if (data.status === 'connected' && !isConnected) {
       isConnected = true;
       updateStatus('connected', '🟢 متصل');
@@ -159,12 +198,13 @@ async function joinRoom() {
       captionArea.classList.add('visible');
     }
 
-    // Handle offer
-    if (data.offer && !pc) {
+    // Handle offer - if we haven't received it yet
+    if (data.offer && !hasReceivedOffer && !pc) {
+      hasReceivedOffer = true;
       await handleOffer(data.offer);
     }
 
-    // Handle answer
+    // Handle answer - if we sent offer and got answer back
     if (data.answer && pc && pc.signalingState === 'have-local-offer') {
       await handleAnswer(data.answer);
     }
@@ -176,16 +216,18 @@ async function joinRoom() {
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
         const candidate = change.doc.data();
-        if (candidate.from !== (isInitiator ? 'initiator' : 'receiver') && pc) {
+        // Accept candidates from the other party
+        if (pc) {
           pc.addIceCandidate(new RTCIceCandidate(candidate.candidate)).catch(console.error);
         }
       }
     });
   });
 
-  // If we're the initiator, create and send offer
-  if (isInitiator) {
-    await createAndSendOffer();
+  // If we're the first participant (no offer in room), create and send offer atomically
+  const roomData = roomSnap.data();
+  if (!roomData?.offer && !hasSentOffer) {
+    await createAndSendOfferAtomic();
   }
 }
 
@@ -244,6 +286,9 @@ function createPeerConnection() {
 }
 
 async function createAndSendOffer() {
+  if (hasSentOffer) return;
+  hasSentOffer = true;
+  
   await createPeerConnection();
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
@@ -251,8 +296,49 @@ async function createAndSendOffer() {
   const roomRef = doc(db, 'rooms', roomId);
   await updateDoc(roomRef, {
     offer: offer.toJSON(),
+    status: 'waiting',
     updatedAt: serverTimestamp()
   });
+  
+  updateStatus('waiting', 'في انتظار الطرف الآخر…');
+}
+
+async function createAndSendOfferAtomic() {
+  const roomRef = doc(db, 'rooms', roomId);
+  
+  try {
+    await runTransaction(db, async (transaction) => {
+      const roomDoc = await transaction.get(roomRef);
+      if (!roomDoc.exists()) {
+        throw new Error('Room does not exist');
+      }
+      const data = roomDoc.data();
+      // Only create offer if none exists
+      if (data.offer) {
+        return; // Another participant already created the offer
+      }
+      
+      // Create peer connection and offer within transaction
+      await createPeerConnection();
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      
+      transaction.update(roomRef, {
+        offer: offer.toJSON(),
+        status: 'waiting',
+        updatedAt: serverTimestamp()
+      });
+      
+      hasSentOffer = true;
+    });
+    
+    if (hasSentOffer) {
+      updateStatus('waiting', 'في انتظار الطرف الآخر…');
+    }
+  } catch (err) {
+    console.error('Atomic offer creation failed:', err);
+    hasSentOffer = false;
+  }
 }
 
 async function handleOffer(offer) {
@@ -267,6 +353,12 @@ async function handleOffer(offer) {
     status: 'connected',
     updatedAt: serverTimestamp()
   });
+  
+  isConnected = true;
+  updateStatus('connected', '🟢 متصل');
+  callControls.style.display = 'flex';
+  preCallControls.style.display = 'none';
+  captionArea.classList.add('visible');
 }
 
 async function handleAnswer(answer) {
@@ -280,10 +372,8 @@ async function handleAnswer(answer) {
 
 async function sendIceCandidate(candidate) {
   const candidatesRef = collection(db, 'rooms', roomId, 'candidates');
-  const from = isInitiator ? 'initiator' : 'receiver';
   await addDoc(candidatesRef, {
     candidate: candidate.toJSON(),
-    from,
     timestamp: serverTimestamp()
   });
 }
@@ -315,10 +405,22 @@ function copyRoomLink() {
   });
 }
 
-function endCall(notifyServer = true) {
+async function endCall(notifyServer = true) {
   if (notifyServer && roomId) {
     const roomRef = doc(db, 'rooms', roomId);
-    updateDoc(roomRef, { status: 'ended', updatedAt: serverTimestamp() }).catch(() => {});
+    // Reset room to waiting state for a new participant instead of ending
+    await updateDoc(roomRef, {
+      status: 'waiting',
+      offer: null,
+      answer: null,
+      updatedAt: serverTimestamp()
+    }).catch(() => {});
+    
+    // Clear ICE candidates subcollection
+    const candidatesRef = collection(db, 'rooms', roomId, 'candidates');
+    const candidatesSnap = await getDocs(candidatesRef);
+    const deletePromises = candidatesSnap.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises).catch(() => {});
   }
   cleanup();
   showToast('انتهت المكالمة');
