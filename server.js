@@ -140,7 +140,8 @@ function translateViaTkalam(text, targetLang, callback) {
 
 function translateViaMyMemory(text, from, to, callback) {
   const q = encodeURIComponent(text);
-  const url = `${MYMEMORY_URL}?q=${q}&langpair=${from}|${to}`;
+  const langFrom = (from === 'ar-MA') ? 'ar' : from;
+  const url = `${MYMEMORY_URL}?q=${q}&langpair=${langFrom}|${to}`;
   https.get(url, function (res) {
     let raw = "";
     res.on("data", c => (raw += c));
@@ -179,33 +180,43 @@ function registerHost(socket, hostId, hostName) {
   socket.hostId = hostId;
   // Send current waiting calls to this host
   sendHostList(socket);
+  // Match any visitors that were already waiting when this host came online
+  waitingVisitors.slice().forEach(function (callId) { tryMatchHost(callId); });
 }
 
 function tryMatchHost(callId) {
   const call = translatorCalls.get(callId);
   if (!call || call.status !== 'waiting') return;
-  
+
   // Find available host
   for (const [hostId, host] of availableHosts) {
     if (host.status === 'available') {
       call.host = hostId;
       call.status = 'matched';
       host.status = 'busy';
-      
+
+      // Remove from waiting queue
+      const wIdx = waitingVisitors.indexOf(callId);
+      if (wIdx > -1) waitingVisitors.splice(wIdx, 1);
+
       // Notify visitor
       if (call.visitor.readyState === WebSocket.OPEN) {
         call.visitor.send(JSON.stringify({ type: 'call-matched', callId }));
       }
-      // Notify host
+      // Notify host (include id/lang/time used by the dashboard UI)
       if (host.socket.readyState === WebSocket.OPEN) {
-        host.socket.send(JSON.stringify({ 
-          type: 'new-call', 
-          callId, 
-          visitorName: 'زائر', // Will be updated with real name
+        host.socket.send(JSON.stringify({
+          type: 'new-call',
+          id: callId,
+          callId: callId,
+          visitorName: 'زائر',
+          lang: call.visitorLang,
           visitorLang: call.visitorLang,
-          hostLang: call.hostLang
+          hostLang: call.hostLang,
+          time: new Date(call.createdAt).toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' })
         }));
       }
+      broadcastHostList();
       break;
     }
   }
@@ -213,21 +224,40 @@ function tryMatchHost(callId) {
 
 function acceptCall(callId, hostId) {
   const call = translatorCalls.get(callId);
-  if (!call || call.host !== hostId) return false;
-  
+  if (!call) return false;
+  if (call.status === 'ended' || call.status === 'active') return false;
+  if (call.host && call.host !== hostId) return false;
+
+  // Claim the call if it was not auto-matched yet
+  if (!call.host) {
+    call.host = hostId;
+    const wIdx = waitingVisitors.indexOf(callId);
+    if (wIdx > -1) waitingVisitors.splice(wIdx, 1);
+    const hostEntry = availableHosts.get(hostId);
+    if (hostEntry) hostEntry.status = 'busy';
+  }
+
   call.status = 'active';
   call.acceptedAt = Date.now();
-  
+
+  const host = availableHosts.get(call.host);
+
   // Notify visitor
   if (call.visitor.readyState === WebSocket.OPEN) {
     call.visitor.send(JSON.stringify({ type: 'call-accepted', callId }));
   }
-  // Notify host
-  const host = availableHosts.get(hostId);
+  // Notify host with full call info (used by startActiveCall)
   if (host && host.socket.readyState === WebSocket.OPEN) {
-    host.socket.send(JSON.stringify({ type: 'call-accepted', callId }));
+    host.socket.send(JSON.stringify({
+      type: 'call-accepted',
+      id: callId,
+      callId: callId,
+      visitorName: 'زائر',
+      visitorLang: call.visitorLang,
+      hostLang: call.hostLang
+    }));
   }
-  
+
   // Broadcast updated list to all hosts
   broadcastHostList();
   return true;
@@ -263,32 +293,37 @@ function endCall(callId) {
 function handleVisitorSpeech(callId, text, lang) {
   const call = translatorCalls.get(callId);
   if (!call || call.status !== 'active') return;
-  
-  // In a real app, translate here using OpenRouter or other API
-  // For now, just forward to host
-  const host = availableHosts.get(call.host);
-  if (host && host.socket.readyState === WebSocket.OPEN) {
-    host.socket.send(JSON.stringify({ 
-      type: 'visitor-speech', 
-      callId, 
-      text, 
-      translated: text // Would be translated in production
-    }));
-  }
+
+  // Translate the visitor's speech into the host's language before forwarding
+  fetchTranslation(text, call.visitorLang, call.hostLang, function (translated) {
+    const host = availableHosts.get(call.host);
+    if (host && host.socket.readyState === WebSocket.OPEN) {
+      host.socket.send(JSON.stringify({
+        type: 'visitor-speech',
+        callId,
+        text: text,
+        translated: translated || text
+      }));
+    }
+  });
 }
 
 function handleHostSpeech(callId, text, translated) {
   const call = translatorCalls.get(callId);
   if (!call || call.status !== 'active') return;
-  
-  if (call.visitor && call.visitor.readyState === WebSocket.OPEN) {
-    call.visitor.send(JSON.stringify({ 
-      type: 'host-speech', 
-      callId, 
-      text, 
-      translated 
-    }));
-  }
+
+  // Translate the host's Darija into the visitor's language before forwarding
+  const source = translated || text;
+  fetchTranslation(source, 'ar-MA', call.visitorLang, function (result) {
+    if (call.visitor && call.visitor.readyState === WebSocket.OPEN) {
+      call.visitor.send(JSON.stringify({
+        type: 'host-speech',
+        callId,
+        text: source,
+        translated: result || source
+      }));
+    }
+  });
 }
 
 function sendHostList(socket) {
@@ -315,7 +350,7 @@ function broadcastHostList() {
       lang: call.visitorLang,
       status: call.status,
       time: new Date(call.createdAt).toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' }),
-      duration: call.acceptedAt ? Math.floor((call.endedAt || Date.now()) - call.acceptedAt) / 60000 : 0
+      duration: call.acceptedAt ? Math.floor(((call.endedAt || Date.now()) - call.acceptedAt) / 60000) : 0
     });
   }
   for (const [hostId, host] of availableHosts) {
@@ -333,7 +368,7 @@ const server = http.createServer(function (req, res) {
     const rawText = u.searchParams.get("text") || "";
     const from = u.searchParams.get("from") || "ar";
     const to = u.searchParams.get("to") || "en";
-    const textToTranslate = (from === "ar-MA") ? rawText : normalizeDarija(rawText);
+    const textToTranslate = (from === "ar") ? rawText : normalizeDarija(rawText);
     fetchTranslation(textToTranslate, from, to, function (translated) {
       res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" });
       res.end(JSON.stringify({ original: rawText, translated }));
@@ -391,6 +426,7 @@ wss.on("connection", function (socket) {
       const callId = createCall(socket, data.lang);
       socket.callId = callId;
       me.role = 'visitor';
+      socket.send(JSON.stringify({ type: 'call-created', callId: callId }));
       return;
     }
 
@@ -480,10 +516,12 @@ function broadcastToRole(role, data) {
   });
 }
 
-server.listen(3000, "0.0.0.0", function () {
-  console.log("✅  الخادم يعمل على http://localhost:3000");
-  console.log("   موقع الفندق    : http://localhost:3000/");
-  console.log("   لوحة الفندق    : http://localhost:3000/host.html");
-  console.log("   المترجم (زائر) : http://localhost:3000/translator");
-  console.log("   لوحة المترجم   : http://localhost:3000/translator-host");
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, "0.0.0.0", function () {
+  console.log("✅  الخادم يعمل على http://localhost:" + PORT);
+  console.log("   موقع الفندق    : http://localhost:" + PORT + "/");
+  console.log("   لوحة الفندق    : http://localhost:" + PORT + "/host.html");
+  console.log("   المترجم (زائر) : http://localhost:" + PORT + "/translator");
+  console.log("   لوحة المترجم   : http://localhost:" + PORT + "/translator-host");
 });
