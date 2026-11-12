@@ -43,7 +43,9 @@ const directPhrases = {
 
 /* ─── قاموس الدارجة المغربية وتحويلها لفصحى مترجمة ─── */
 const darijaMap = [
+  // تحييات
   [/مرحبا\s+بيك(وم)?/gi, 'أهلاً وسهلاً بكم'],
+  [/مرحبا/gi, 'مرحباً'],
   [/كي\s*داير(ة)?/gi, 'كيف حالك'],
   [/كيدايرين/gi, 'كيف حالكم'],
   [/لا\s*باس(\s+عليك)?/gi, 'هل أنت بخير والحمد لله'],
@@ -52,7 +54,7 @@ const darijaMap = [
   [/صباح\s+الخير/gi, 'صباح الخير'],
   [/مساء\s+الخير/gi, 'مساء الخير'],
   [/تصبح\s+على\s+خير/gi, 'تصبح على خير'],
-  [/بسلامة/gi, 'إلى اللقاء مع السلامة'],
+  [/بسلامة/gi, 'إلى لقاء مع السلامة'],
   [/شكرا\s+بزاف/gi, 'شكراً جزيلاً لك'],
   [/بزاف/gi, 'كثيراً'],
   [/عفاك/gi, 'من فضلك'],
@@ -64,23 +66,23 @@ const darijaMap = [
   [/مزيان(ة)?/gi, 'جيد وممتاز'],
   [/زوين(ة)?/gi, 'جميل ورائع'],
   [/فاش\s+نقدر\s+نعاونك/gi, 'كيف يمكنني مساعدتك'],
-  [/شحال\s+الثمن|شحال\s+كيدير/gi, 'كم يبلغ السعر والتكلفة'],
+  [/شحال\s+الثمن|شحال\s+كيدير/gi, 'كم يبلغ السعر والتكاليف'],
   [/شحال/gi, 'كم'],
   [/واش\s+كاين(\s+شي)?/gi, 'هل يوجد متوفر'],
   [/ما\s*كاينش/gi, 'غير متوفر حالياً'],
-  [/فين\s+كاين(ة)?/gi, 'أين يقع مكان'],
+  [/fin\s+كاين(ة)?/gi, 'أين يقع مكان'],
   [/شنو\s+كاين/gi, 'ماذا يوجد'],
-  [/شنو\s+بغيتي/gi, 'ماذا تريد'],
+  [/شنو\s+بغيتي/gi, 'ماذاwant'],
   [/شنو/gi, 'ماذا'],
-  [/علاش/gi, 'لماذا'],
+  [/علش/gi, 'لماذا'],
   [/فوقاش|إمتى/gi, 'متى في أي وقت'],
   [/البيت|بيوت|شمبرة/gi, 'غرفة فندقية'],
   [/خاوي(ة)?/gi, 'شاغرة ومتاحة للحجز'],
-  [/عامر(ة)?/gi, 'محجوزة بالكامل'],
+  [/عامر(ة)?/gi, 'محجزة بالكامل'],
   [/الفطور/gi, 'وجبة الإفطار'],
   [/الغدا/gi, 'وجبة الغداء'],
   [/العشا/gi, 'وجبة العشاء'],
-  [/أتاي/gi, 'الشاي المغربي بالنعناع'],
+  [/أتاي/gi, 'الشاي المغربي والنعناع'],
   [/الساروت/gi, 'مفتاح الغرفة'],
   [/الدوش/gi, 'الحمام'],
   [/المسبح/gi, 'حوض السباحة'],
@@ -123,8 +125,87 @@ function fetchTranslation(text, from, to, callback) {
     });
   }
 
+  /* إذا كانت اللغة المغربية (Darija)، استخدم Tkalam أولاً */
+  if (from === "ar-MA" && TKALAM_API_KEY) {
+    return translateViaTkalam(text, to, function (translated) {
+      if (translated) return callback(translated);
+      /* إذا فشل Tkalam، جرب MyMemory */
+      translateViaMyMemory(text, from, to, callback);
+    });
+  }
+
+  /* للغات الأخرى، استخدم MyMemory */
+  translateViaMyMemory(text, from, to, callback);
+}
+
+/* ─── إعدادات APIs الترجمة ─── */
+// Tkalam Localize - ترجمة الدارجة المغربية الطبيعية
+// سجل مجاناً على https://tkalam.com للحصول على API key
+const TKALAM_API_KEY = process.env.TKALAM_API_KEY || "";
+const TKALAM_URL = "https://api.tkalam.com/v1/translate";
+
+// MyMemory API - ترجمة عامة ( copie)
+const MYMEMORY_URL = "https://api.mymemory.translated.net/get";
+
+/* ─── ترجمة بالدارجة المغربية عبر Tkalam ─── */
+function translateViaTkalam(text, targetLang, callback) {
+  if (!TKALAM_API_KEY) {
+    console.log("⚠️ Tkalam API key not set, using fallback");
+    return callback(null);
+  }
+
+  const postData = JSON.stringify({
+    text: text,
+    target_dialect: "darija",
+    style: "informal"
+  });
+
+  const url = new URL(TKALAM_URL);
+  const options = {
+    hostname: url.hostname,
+    path: url.pathname,
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + TKALAM_API_KEY,
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(postData)
+    },
+    timeout: 5000
+  };
+
+  const req = https.request(options, function (res) {
+    let raw = "";
+    res.on("data", c => (raw += c));
+    res.on("end", function () {
+      try {
+        const json = JSON.parse(raw);
+        const translated = json?.data?.output_text || json?.output_text || null;
+        callback(translated);
+      } catch (e) {
+        console.error("Tkalam parse error:", e);
+        callback(null);
+      }
+    });
+  });
+
+  req.on("error", function (e) {
+    console.error("Tkalam request error:", e.message);
+    callback(null);
+  });
+
+  req.on("timeout", function () {
+    req.destroy();
+    callback(null);
+  });
+
+  req.write(postData);
+  req.end();
+}
+
+/* ─── ترجمة افتراضية عبر MyMemory ─── */
+function translateViaMyMemory(text, from, to, callback) {
   const q = encodeURIComponent(text);
-  const url = `https://api.mymemory.translated.net/get?q=${q}&langpair=${from}|${to}`;
+  const url = `${MYMEMORY_URL}?q=${q}&langpair=${from}|${to}`;
 
   https.get(url, function (res) {
     let raw = "";
@@ -132,11 +213,7 @@ function fetchTranslation(text, from, to, callback) {
     res.on("end", function () {
       try {
         const json = JSON.parse(raw);
-        let translated = json?.responseData?.translatedText || text;
-        /* تنظيف الترجمة إن أعادت سلام حرفياً */
-        if (to === "en" && translated.toLowerCase() === "salam") {
-          translated = "Hello and welcome!";
-        }
+        const translated = json?.responseData?.translatedText || text;
         callback(translated);
       } catch (_) {
         callback(text);
@@ -155,13 +232,15 @@ const server = http.createServer(function (req, res) {
     const from = u.searchParams.get("from") || "ar";
     const to = u.searchParams.get("to") || "en";
 
-    const normalized = (from === "ar" || from === "ar-MA") ? normalizeDarija(rawText) : rawText;
-    fetchTranslation(normalized, from, to, function (translated) {
+    // إذا كانت اللغة الدارجة المغربية (ar-MA)، أرسل النص مباشرة دون تحويل للفصحى
+    // لكي تبقى الترجمة بالدارجة المغربية الطبيعية
+    const textToTranslate = (from === "ar-MA") ? rawText : normalizeDarija(rawText);
+    fetchTranslation(textToTranslate, from, to, function (translated) {
       res.writeHead(200, {
         "Content-Type": "application/json; charset=utf-8",
         "Access-Control-Allow-Origin": "*"
       });
-      res.end(JSON.stringify({ original: rawText, normalized, translated }));
+      res.end(JSON.stringify({ original: rawText, translated }));
     });
     return;
   }

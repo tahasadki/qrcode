@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="لوحة الم添ف - رياض دار الن dispel">
+  <title>لوحة الم添ف - رياض دار الن dispel</title>
+  <link rel="stylesheet" href="index.css">
+  <style>
+    body { background: linear-gradient(135deg, #3e2b20 0%, #6b4423 100%); min-height:100vh; display:flex; align-items:center; justify-content:center; }
+    .login-card { background:var(--paper); padding:48px 40px; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.4); text-align:center; max-width:440px; width:100%; border:2px solid var(--gold); }
+    .login-card h1 { font-family:Amiri,serif; color:var(--brown); font-size:36px; margin-bottom:6px; }
+    .login-card .sub { color:var(--brown-light); font-size:14px; margin-bottom:32px; }
+    .google-btn { display:inline-flex; align-items:center; gap:14px; padding:14px 28px; border:2px solid var(--gold); border-radius:8px; background:#fff; cursor:pointer; font-size:16px; font-family:Cairo,sans-serif; font-weight:bold; color:var(--brown); transition:all .3s; }
+    .google-btn:hover { background:var(--gold-light); transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.2); }
+    .google-btn .icon { font-size:24px; }
+    .status { margin-top:24px; font-size:14px; color:var(--brown-light); min-height:20px; }
+    .back-link { margin-top:20px; display:block; color:var(--gold); text-decoration:none; font-size:13px; }
+    .back-link:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>🏠 رياض دار الن dispel</h1>
+    <p class="sub">لوحة الم添ف - Host Dashboard</p>
+    
+    <button class="google-btn" id="googleLoginBtn">
+      <span class="icon">🔍</span>
+      <span>Sign in with Google</span>
+    </button>
+    
+    <p class="status" id="status"></p>
+    
+    <a href="index.html" class="back-link">← العودة للصفحة الرئيسية</a>
+  </div>
+
+  <script>
+    document.getElementById("googleLoginBtn").addEventListener("click", function() {
+      const status = document.getElementById("status");
+      status.textContent = "جاري التوجيه إلى Google...";
+      status.style.color = "#934936";
+      
+      // Simulate Google OAuth - in production this would redirect to Google OAuth
+      setTimeout(function() {
+        status.textContent = "تم التحميل... ي redirected للوحة الم添ف";
+        status.style.color = "#3d7a52";
+        setTimeout(function() {
+          window.location.href = "host.html";
+        }, 1000);
+      }, 1500);
+    });
+  </script>
+</body>
+</html>

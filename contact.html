@@ -237,6 +237,7 @@
       <a href="./qr.html">Home</a>
       <a href="./qr.html#about">About</a>
       <a href="./contact.html">Contact Host</a>
+      <a href="./host-login.html" style="color:var(--gold);font-weight:bold;">Host Login</a>
     </nav>
     <a href="./contact.html" class="header-button">Call Host</a>
   </header>
@@ -746,13 +747,32 @@
   function speak(text, locale) {
     if (!window.speechSynthesis) return;
     speechSynthesis.cancel();
+    
     const u = new SpeechSynthesisUtterance(text);
     u.lang = locale;
     u.volume = 1;
-    u.rate = 1;
+    u.rate = locale === "ar-MA" ? 0.85 : 0.95;
+    u.pitch = 1.05;
+    
     const voices = speechSynthesis.getVoices();
-    const v = voices.find(voice => voice.lang.startsWith(locale.slice(0, 2)));
-    if (v) u.voice = v;
+    
+    // Natural/Neural voices first
+    const naturalVoices = voices.filter(v => 
+      v.lang === locale && 
+      (v.name.includes("Google") || v.name.includes("Amazon") || 
+       v.name.includes("Microsoft") || v.name.includes("Natural") ||
+       v.name.includes("Neural") || v.name.includes("Aria") ||
+       v.name.includes("Jenny") || v.name.includes("Sara"))
+    );
+    const langVoices = voices.filter(v => v.lang.startsWith(locale.slice(0, 2)));
+    const defaultVoice = voices.find(v => v.lang.startsWith("en"));
+    
+    const selectedVoice = naturalVoices[0] || langVoices[0] || defaultVoice;
+    if (selectedVoice) {
+      u.voice = selectedVoice;
+      console.log("🔊 Using voice:", selectedVoice.name, selectedVoice.lang);
+    }
+    
     speechSynthesis.speak(u);
   }
 
