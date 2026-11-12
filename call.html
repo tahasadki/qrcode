@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مكالمة - رياض دار النخيل</title>
+  <link rel="stylesheet" href="index.css">
+  <style>
+    .call-page {
+      min-height: 100vh;
+      background: var(--sand);
+      font-family: "Cairo", sans-serif;
+    }
+
+    .call-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--brown);
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .call-header-left { display: flex; align-items: center; gap: 16px; }
+    .call-logo {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--terracotta), var(--gold));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .call-header h1 {
+      font-family: "Amiri", Georgia, serif;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .room-badge {
+      background: rgba(255,255,255,0.15);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-family: monospace;
+      direction: ltr;
+    }
+
+    main { padding: 40px 20px; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+
+    .call-container {
+      width: min(900px, 100%);
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    @media (min-width: 768px) {
+      .call-container { grid-template-columns: 1fr 1fr; }
+    }
+
+    .video-panel {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(62,43,32,0.1);
+    }
+
+    .video-header {
+      background: var(--brown);
+      color: white;
+      padding: 16px 20px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .video-area {
+      position: relative;
+      aspect-ratio: 16/9;
+      background: #111;
+      overflow: hidden;
+    }
+
+    .video-area video {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+
+    .video-area video[local] {
+      position: absolute;
+      bottom: 16px; right: 16px;
+      width: 180px; height: 101px;
+      border-radius: 8px;
+      border: 3px solid var(--gold);
+      background: #000;
+      z-index: 10;
+    }
+
+    .video-area .waiting {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; color: #888; gap: 12px;
+    }
+    .video-area .waiting .icon { font-size: 48px; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+    .controls-panel {
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 8px 24px rgba(62,43,32,0.1);
+    }
+
+    .status-row {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      padding: 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .status-row.waiting { background: rgba(189,145,75,0.15); color: var(--gold); border: 1px solid var(--gold-light); }
+    .status-row.connecting { background: rgba(147,73,54,0.15); color: var(--terracotta); border: 1px solid var(--terracotta); }
+    .status-row.connected { background: rgba(61,122,82,0.15); color: var(--green); border: 1px solid var(--green); }
+    .status-row.ended { background: rgba(150,63,53,0.15); color: var(--red); border: 1px solid var(--red); }
+
+    .pulse-dot {
+      width: 10px; height: 10px;
+      background: currentColor;
+      border-radius: 50%;
+      animation: pulse-dot 1.5s infinite;
+    }
+    @keyframes pulse-dot { 0%,100%{transform:scale(1);opacity:1;} 50%{transform:scale(0.8);opacity:0.4;} }
+
+    .control-row {
+      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px;
+    }
+    .ctrl-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 20px;
+      border: none; border-radius: 8px;
+      font-family: "Cairo", sans-serif;
+      font-size: 14px; font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ctrl-btn:hover { transform: translateY(-2px); }
+    .ctrl-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-mute { background: var(--brown-light); color: white; }
+    .btn-mute.active { background: var(--terracotta-dark); }
+    .btn-camera { background: var(--terracotta); color: white; }
+    .btn-camera.active { background: var(--terracotta-dark); }
+    .btn-end { background: var(--terracotta-dark); color: white; }
+    .btn-end:hover { background: #682d22; }
+    .btn-copy { background: var(--gold); color: var(--brown); }
+
+    .info-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;
+    }
+    .info-item {
+      background: var(--sand);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+    .info-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--terracotta); text-transform: uppercase; margin-bottom: 6px; }
+    .info-value { font-family: monospace; font-size: 13px; color: var(--brown); word-break: break-all; direction: ltr; }
+
+    .caption-area {
+      margin-top: 20px;
+      padding: 16px;
+      background: var(--sand);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-height: 60px;
+      display: none;
+    }
+    .caption-area.visible { display: block; }
+    .caption-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--terracotta); text-transform: uppercase; margin-bottom: 8px; }
+    .caption-text { font-size: 15px; line-height: 1.8; color: var(--brown); direction: auto; }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--terracotta); font-weight: 600; text-decoration: none;
+      margin-top: 16px;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    .error-toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--terracotta-dark); color: white;
+      padding: 14px 28px; border-radius: 8px;
+      font-weight: 600; z-index: 9999;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+    @media (max-width: 600px) {
+      .video-area video[local] { width: 120px; height: 67px; bottom: 8px; right: 8px; }
+      .ctrl-btn { padding: 10px 16px; font-size: 13px; }
+    }
+  </style>
+</head>
+<body class="call-page">
+  <header class="call-header">
+    <div class="call-header-left">
+      <div class="call-logo">📞</div>
+      <h1>مكالمة فيديو</h1>
+    </div>
+    <div class="room-badge" id="roomBadge">جارٍ التحميل…</div>
+  </header>
+
+  <main>
+    <div class="call-container">
+      <!-- Remote Video Panel -->
+      <section class="video-panel" aria-label="فيديو الطرف الآخر">
+        <div class="video-header">المضيف</div>
+        <div class="video-area" id="remoteArea">
+          <div class="waiting" id="remoteWaiting">
+            <div class="icon">📞</div>
+            <span>في انتظار الاتصال…</span>
+          </div>
+          <video id="remoteVideo" autoplay playsinline style="display:none;"></video>
+        </div>
+      </section>
+
+      <!-- Local Video Panel -->
+      <section class="video-panel" aria-label="فيديوك">
+        <div class="video-header">أنت <span style="font-weight:400;font-size:12px;opacity:0.8;">(مصغّر، صامت)</span></div>
+        <div class="video-area" id="localArea">
+          <div class="waiting" id="localWaiting">
+            <div class="icon">🎥</div>
+            <span>جاري تشغيل الكاميرا…</span>
+          </div>
+          <video id="localVideo" autoplay muted playsinline local style="display:none;"></video>
+        </div>
+      </section>
+    </div>
+
+    <!-- Controls & Info -->
+    <section class="controls-panel">
+      <div class="status-row waiting" id="statusRow">
+        <span class="pulse-dot"></span>
+        <span id="statusText">جاري الاتصال…</span>
+      </div>
+
+      <div class="control-row" id="callControls" style="display:none;">
+        <button class="ctrl-btn btn-mute" id="muteBtn">🎤 كتم</button>
+        <button class="ctrl-btn btn-camera" id="cameraBtn">📷 إيقاف الكاميرا</button>
+        <button class="ctrl-btn btn-end" id="endBtn">📵 إنهاء المكالمة</button>
+      </div>
+
+      <div class="control-row" id="preCallControls">
+        <button class="ctrl-btn btn-copy" id="copyLinkBtn">📋 نسخ رابط الغرفة</button>
+        <a href="index.html" class="ctrl-btn" style="background:var(--brown-light);color:white;text-decoration:none;">← العودة</a>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">معرف الغرفة</div>
+          <div class="info-value" id="roomIdDisplay">—</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">حالة الاتصال</div>
+          <div class="info-value" id="connStateDisplay">—</div>
+        </div>
+      </div>
+
+      <!-- Caption Area (for Phase 2 translation) -->
+      <div class="caption-area" id="captionArea">
+        <div class="caption-label">النص المترجم (Caption)</div>
+        <div class="caption-text" id="captionText">—</div>
+      </div>
+    </section>
+
+    <a href="index.html" class="back-link">← العودة للصفحة الرئيسية</a>
+  </main>
+
+  <footer class="site-footer">
+    <strong>رياض دار النخيل</strong>
+    <span>تجربة مغربية أصيلة تستحق الزيارة</span>
+  </footer>
+
+  <!-- Firebase SDK -->
+  <script type="module" src="call.js"></script>
+</body>
+</html>
