@@ -54,6 +54,7 @@
         <input type="text" id="roomIdInput" placeholder="call-xyz123..." autocomplete="off" spellcheck="false">
       </div>
       <button class="join-btn" id="joinRoomBtn">📞 الانضمام للغرفة</button>
+      <button class="join-btn" id="createRoomBtn" style="background:var(--gold);color:var(--brown);margin-top:8px;">➕ إنشاء غرفة جديدة (مضيف)</button>
     </div>
     
     <a href="index.html" class="back-link">← العودة للصفحة الرئيسية</a>
@@ -85,12 +86,18 @@
       window.location.href = `call.html?room=${encodeURIComponent(roomId)}`;
     });
 
-    // Allow Enter key to join
-    document.getElementById("roomIdInput").addEventListener("keydown", function(e) {
-      if (e.key === "Enter") {
-        document.getElementById("joinRoomBtn").click();
-      }
-    });
+// Allow Enter key to join
+document.getElementById("roomIdInput").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    document.getElementById("joinRoomBtn").click();
+  }
+});
+
+// Create new room and join as host
+document.getElementById("createRoomBtn").addEventListener("click", function() {
+  const roomId = 'call-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
+  window.location.href = `call.html?room=${encodeURIComponent(roomId)}`;
+});
   </script>
 </body>
 </html>
