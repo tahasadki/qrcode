@@ -16,7 +16,7 @@ socket.addEventListener("open", function () {
 
 socket.addEventListener("error", function () {
   statusText.textContent =
-    "تعذر الاتصال بالخادم. تأكد من تشغيل server-legacy.js.";
+    "تعذر الاتصال بالخادم. تأكد من تشغيل server.js.";
 });
 
 socket.addEventListener("close", function () {

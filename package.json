@@ -1,19 +1,26 @@
 {
-  "name": "instant-translator",
+  "name": "qrcode",
   "version": "1.0.0",
-  "description": "Real-time speech translation with Google OAuth",
-  "main": "api/index.js",
+  "description": "Real-time translation platform with WebRTC",
+  "main": "server.js",
   "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel --prod",
-    "start": "node server-legacy.js"
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tahasadki/qrcode.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tahasadki/qrcode/issues"
+  },
+  "homepage": "https://github.com/tahasadki/qrcode#readme",
   "dependencies": {
-    "firebase-admin": "^12.0.0",
-    "firebase": "^10.8.0",
-    "ws": "^8.22.1"
-  },
-  "devDependencies": {
-    "vercel": "^33.0.0"
+    "ws": "^8.22.1",
+    "firebase-admin": "^12.0.0"
   }
 }

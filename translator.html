@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مترجم فوري - رياض دار النخيل</title>
+  <link rel="stylesheet" href="index.css">
+  <style>
+    /* Translator specific styles - using index.css variables */
+    .translator-page {
+      min-height: 100vh;
+      background: var(--sand);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 130px 20px 90px;
+    }
+    
+    .translator-card {
+      width: min(520px, 100%);
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 16px 40px rgba(62,43,32,0.12);
+      padding: 40px;
+      text-align: center;
+    }
+    
+    .translator-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 24px;
+      background: linear-gradient(135deg, var(--terracotta), var(--gold));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      box-shadow: 0 8px 24px rgba(147,73,54,0.3);
+    }
+    
+    .translator-card h1 {
+      font-family: "Amiri", Georgia, serif;
+      font-size: 36px;
+      color: var(--brown);
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
+    
+    .translator-subtitle {
+      color: var(--brown-light);
+      font-size: 14px;
+      line-height: 1.8;
+      margin-bottom: 32px;
+    }
+    
+    .lang-selector {
+      text-align: right;
+      margin-bottom: 28px;
+    }
+    
+    .lang-selector label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--brown);
+      letter-spacing: 0.5px;
+    }
+    
+    .lang-selector select {
+      width: 100%;
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: white;
+      font-family: "Cairo", sans-serif;
+      font-size: 14px;
+      color: var(--brown);
+      cursor: pointer;
+      transition: border-color 0.25s, box-shadow 0.25s;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23934936' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: left 14px center;
+      background-size: 20px;
+      padding-left: 48px;
+    }
+    
+    .lang-selector select:focus {
+      outline: none;
+      border-color: var(--terracotta);
+      box-shadow: 0 0 0 3px rgba(147,73,54,0.15);
+    }
+    
+    .call-btn {
+      width: 100%;
+      padding: 16px 24px;
+      border: none;
+      border-radius: 6px;
+      font-family: "Cairo", sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      background: var(--terracotta);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 14px rgba(147,73,54,0.3);
+    }
+    
+    .call-btn:hover:not(:disabled) {
+      background: var(--terracotta-dark);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(147,73,54,0.4);
+    }
+    
+    .call-btn:active { transform: translateY(0); }
+    
+    .call-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .call-btn.connecting { background: var(--gold); }
+    .call-btn.in-call { background: var(--terracotta); }
+    
+    .status {
+      margin-top: 24px;
+      padding: 16px 20px;
+      border-radius: 6px;
+      font-size: 13px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 500;
+    }
+    
+    .status.waiting {
+      background: rgba(189,145,75,0.15);
+      color: var(--gold);
+      border: 1px solid var(--gold-light);
+    }
+    
+    .status.connecting {
+      background: rgba(147,73,54,0.1);
+      color: var(--terracotta);
+      border: 1px solid var(--terracotta);
+    }
+    
+    .status.connected {
+      background: rgba(147,73,54,0.1);
+      color: var(--terracotta);
+      border: 1px solid var(--terracotta);
+    }
+    
+    .status.error {
+      background: rgba(150,63,53,0.1);
+      color: var(--terracotta-dark);
+      border: 1px solid var(--terracotta-dark);
+    }
+    
+    .pulse {
+      width: 10px;
+      height: 10px;
+      background: currentColor;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+    
+    .transcript-area {
+      margin-top: 24px;
+      padding: 20px;
+      background: var(--sand);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      text-align: right;
+      display: none;
+    }
+    
+    .transcript-area.visible { display: block; }
+    
+    .transcript-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--terracotta);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    
+    .transcript-text {
+      font-size: 15px;
+      line-height: 2;
+      color: var(--brown);
+      min-height: 80px;
+      font-family: "Cairo", sans-serif;
+    }
+    
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 36px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+    }
+    
+    .feature { text-align: center; }
+    
+    .feature-icon {
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+    
+    .feature-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--brown);
+      letter-spacing: 0.5px;
+    }
+    
+    .feature-desc {
+      font-size: 11px;
+      color: var(--brown-light);
+      margin-top: 6px;
+      line-height: 1.6;
+    }
+    
+    /* Footer link */
+    .translator-footer {
+      margin-top: 40px;
+      text-align: center;
+    }
+    
+    .translator-footer a {
+      color: var(--terracotta);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    
+    .translator-footer a:hover {
+      color: var(--terracotta-dark);
+    }
+    
+    @media (max-width: 600px) {
+      .translator-card { padding: 28px 20px; }
+      .translator-card h1 { font-size: 28px; }
+      .features { grid-template-columns: 1fr; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Site Header (same as index.html) -->
+  <header class="site-header">
+    <a href="index.html" class="brand">رياض دار النخيل
+      <small>RIAD DAR NAKHIL</small>
+    </a>
+    <nav class="navigation">
+      <a href="index.html">الرئيسية</a>
+      <a href="#about">عن الرياض</a>
+      <a href="#services">الخدمات</a>
+      <a href="#gallery">الصور</a>
+      <a href="contact.html">تواصل مع المالك</a>
+      <a href="translator-host.html" style="color:var(--gold);">لوحة المترجم</a>
+    </nav>
+    <a href="contact.html" class="header-button">احجز إقامتك</a>
+  </header>
+
+  <!-- Translator Page -->
+  <main class="translator-page">
+    <div class="translator-card">
+      <div class="translator-icon">🌐</div>
+      <h1>مترجم فوري</h1>
+      <p class="translator-subtitle">مكالمات صوتية مع ترجمة فورية بالذكاء الاصطناعي — 12+ لغة مدعومة</p>
+      
+      <div class="lang-selector">
+        <label for="visitorLang">لغتك:</label>
+        <select id="visitorLang">
+          <option value="ar">العربية</option>
+          <option value="ar-MA">المغربية (الدارجة)</option>
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="ru">Русский</option>
+          <option value="zh">中文</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="tr">Türkçe</option>
+          <option value="nl">Nederlands</option>
+        </select>
+      </div>
+      
+      <button id="callBtn" class="call-btn">
+        <span class="btn-icon">📞</span>
+        <span class="btn-text">بدء مكالمة مترجمة</span>
+      </button>
+      
+      <div id="status" class="status waiting">
+        <span class="pulse"></span>
+        <span>في انتظار المضيف...</span>
+      </div>
+      
+      <div id="transcriptArea" class="transcript-area">
+        <div class="transcript-label">النص المترجم</div>
+        <div id="transcriptText" class="transcript-text">—</div>
+      </div>
+      
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">🎤</div>
+          <div class="feature-title">تعرف على الكلام</div>
+          <div class="feature-desc">تحويل الصوت لنص فوري</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🌐</div>
+          <div class="feature-title">ترجمة فورية</div>
+          <div class="feature-desc">12+ لغة مدعومة</div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🔊</div>
+          <div class="feature-title">قراءة صوتية</div>
+          <div class="feature-desc">النطق بالترجمة</div>
+        </div>
+      </div>
+      
+      <div class="translator-footer">
+        <a href="index.html">← العودة للموقع الرئيسي</a>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <strong>رياض دار النخيل</strong>
+    <span>تجربة مغربية أصيلة تستحق الزيارة</span>
+  </footer>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+    // Firebase Config - سيتم استبداله من متغيرات البيئة
+    const firebaseConfig = {
+      apiKey: "__FIREBASE_API_KEY__",
+      authDomain: "__FIREBASE_AUTH_DOMAIN__",
+      projectId: "__FIREBASE_PROJECT_ID__",
+      storageBucket: "__FIREBASE_STORAGE_BUCKET__",
+      messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
+      appId: "__FIREBASE_APP_ID__"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // DOM Elements
+    const visitorLang = document.getElementById('visitorLang');
+    const callBtn = document.getElementById('callBtn');
+    const statusEl = document.getElementById('status');
+    const transcriptArea = document.getElementById('transcriptArea');
+    const transcriptText = document.getElementById('transcriptText');
+
+    // State
+    let pc = null;
+    let localStream = null;
+    let ws = null;
+    let currentCallId = null;
+    let recognition = null;
+    let isInCall = false;
+
+    // WebSocket connection
+    function connectWS() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+      ws.addEventListener('open', () => {
+        console.log('WebSocket connected');
+      });
+
+      ws.addEventListener('message', async (event) => {
+        const data = JSON.parse(event.data);
+        await handleSignal(data);
+      });
+
+      ws.addEventListener('close', () => {
+        setTimeout(connectWS, 2000);
+      });
+    }
+
+    async function handleSignal(data) {
+      switch (data.type) {
+        case 'call-created':
+          currentCallId = data.callId;
+          updateStatus('connecting', 'جاري البحث عن مضيف متاح...');
+          break;
+
+        case 'call-matched':
+          updateStatus('connected', '✅ تم الاتصال بالمضيف — ابدأ بالتحدث');
+          transcriptArea.classList.add('visible');
+          break;
+
+        case 'call-ended':
+          endCall();
+          updateStatus('waiting', 'انتهت المكالمة');
+          break;
+
+        case 'host-speech':
+          if (data.translated) {
+            transcriptText.textContent = data.translated;
+            speakText(data.translated, visitorLang.value);
+          }
+          break;
+
+        case 'transcript':
+          if (data.text) {
+            transcriptText.textContent = data.text;
+          }
+          break;
+
+        case 'error':
+          updateStatus('error', data.message || 'حدث خطأ');
+          endCall();
+          break;
+      }
+    }
+
+    function sendSignal(data) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(data));
+      }
+    }
+
+    function updateStatus(type, message) {
+      statusEl.className = 'status ' + type;
+      statusEl.innerHTML = (type === 'connecting' || type === 'connected') ? 
+        `<span class="pulse"></span>${message}` : message;
+      
+      callBtn.className = 'call-btn' + (type === 'connecting' ? ' connecting' : type === 'connected' ? ' in-call' : '');
+      callBtn.querySelector('.btn-text').textContent = 
+        type === 'connected' ? 'إنهاء المكالمة' : 
+        type === 'connecting' ? 'جاري الاتصال...' : 'بدء مكالمة مترجمة';
+    }
+
+    async function startCall() {
+      const lang = visitorLang.value;
+      
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        
+        // Send call request
+        sendSignal({ type: 'create-call', lang });
+        
+        // Start speech recognition
+        startSpeechRecognition(lang);
+        
+      } catch (err) {
+        console.error('Media error:', err);
+        updateStatus('error', 'تعذر الوصول للميكروفون');
+      }
+    }
+
+    function endCall() {
+      isInCall = false;
+      if (recognition) {
+        try { recognition.stop(); } catch(e) {}
+        recognition = null;
+      }
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+      }
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+      if (currentCallId) {
+        sendSignal({ type: 'end-call', callId: currentCallId });
+        currentCallId = null;
+      }
+      updateStatus('waiting', 'في انتظار المضيف...');
+      transcriptArea.classList.remove('visible');
+      transcriptText.textContent = '—';
+    }
+
+    function startSpeechRecognition(lang) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        console.warn('Speech recognition not supported');
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = lang === 'ar-MA' ? 'ar-MA' : lang;
+
+      let silenceTimer = null;
+
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        if (finalTranscript.trim()) {
+          transcriptText.textContent = finalTranscript.trim();
+          sendSignal({ 
+            type: 'visitor-speech', 
+            callId: currentCallId, 
+            text: finalTranscript.trim(),
+            lang: visitorLang.value
+          });
+        } else if (interimTranscript) {
+          transcriptText.textContent = interimTranscript;
+        }
+
+        // Auto-send after silence
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+          if (finalTranscript.trim()) {
+            sendSignal({ 
+              type: 'visitor-speech-final', 
+              callId: currentCallId, 
+              text: finalTranscript.trim(),
+              lang: visitorLang.value
+            });
+          }
+        }, 1500);
+      };
+
+      recognition.onerror = (e) => {
+        if (e.error !== 'no-speech') console.warn('Recognition error:', e.error);
+      };
+
+      recognition.onend = () => {
+        if (isInCall) {
+          setTimeout(() => { if (isInCall) recognition.start(); }, 300);
+        }
+      };
+
+      isInCall = true;
+      recognition.start();
+    }
+
+    function speakText(text, lang) {
+      if (!('speechSynthesis' in window)) return;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang === 'ar-MA' ? 'ar-MA' : lang;
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      speechSynthesis.speak(utterance);
+    }
+
+    // Event Listeners
+    callBtn.addEventListener('click', () => {
+      if (isInCall) {
+        endCall();
+      } else {
+        startCall();
+      }
+    });
+
+    // Initialize
+    signInAnonymously(auth).catch(console.error);
+    connectWS();
+  </script>
+</body>
+</html>

@@ -439,7 +439,7 @@ const ICE  = [
 
 /* ══════════════════════════════════════════
    DOM
-══════════════════════════════════════════ */
+═══════════════════════════════════════════ */
 const statusDot      = document.getElementById("statusDot");
 const statusText     = document.getElementById("statusText");
 const incomingCall   = document.getElementById("incomingCall");
@@ -863,7 +863,7 @@ function speak(text, locale) {
   // الأولوية 2: أي صوت يتطابق مع اللغة
   const langVoices = voices.filter(v => v.lang.startsWith(locale.slice(0, 2)));
   
-  // الأولوية 3: صوت إنجليزي ك Solutions
+  // الأولوية 3: صوت إنجليزي كحل أخير
   const defaultVoice = voices.find(v => v.lang.startsWith("en"));
   
   const selectedVoice = naturalVoices[0] || langVoices[0] || defaultVoice;
@@ -913,7 +913,7 @@ function stopRinging() {
    ══════════════════════════════════════════ */
 hostLangSel.addEventListener("change", function () {
   hostLang = hostLangSel.value;
-  showToast("🌐 تم تغيير لغة الم添ف إلى: " + hostLangSel.options[hostLangSel.selectedIndex].text);
+  showToast("🌐 تم تغيير لغة المضيف إلى: " + hostLangSel.options[hostLangSel.selectedIndex].text);
   /* إذا كان التعرف على الصوت نشطاً، أعد تشغيله باللغة الجديدة */
   if (hostRec && inCall) {
     try { hostRec.stop(); } catch (_) {}
