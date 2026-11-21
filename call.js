@@ -16,6 +16,7 @@
 // ============================================================
 
 import { app } from './firebase-config.js';
+import { hangup } from './signaling.js';
 import {
   getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc,
   collection, addDoc, deleteDoc, serverTimestamp, getDocs, runTransaction
@@ -178,13 +179,36 @@ async function init() {
     }
   }, 60000);
 
+  // Shared teardown context: proxies this page's live call state so hangup
+  // always reads the current pc / streams / unsubs / roomId.
+  const ctx = {
+    hungUp: false,
+    db,
+    get pc() { return pc; },
+    set pc(v) { pc = v; },
+    get localStream() { return localStream; },
+    set localStream(v) { localStream = v; },
+    get remoteStream() { return remoteStream; },
+    set remoteStream(v) { remoteStream = v; },
+    get unsubRoom() { return unsubRoom; },
+    set unsubRoom(v) { unsubRoom = v; },
+    get unsubCandidates() { return unsubCandidates; },
+    set unsubCandidates(v) { unsubCandidates = v; },
+    get roomId() { return roomId; },
+    set roomId(v) { roomId = v; },
+    localVideo,
+    remoteVideo,
+    statusText,
+    onEnded(reason) { endTouristUI(reason); }
+  };
+
   muteBtn.addEventListener('click', toggleMute);
   cameraBtn.addEventListener('click', toggleCamera);
-  endBtn.addEventListener('click', () => endCall(true));
+  endBtn.addEventListener('click', () => hangup('user-ended', ctx));
   copyLinkBtn.addEventListener('click', copyRoomLink);
   if (retryBtn) retryBtn.addEventListener('click', retryCall);
 
-  window.addEventListener('beforeunload', cleanup);
+  window.addEventListener('pagehide', () => hangup('page-closed', ctx));
 }
 
 // ── Local media ─────────────────────────────────────────────────
@@ -488,10 +512,9 @@ function startRoomListener() {
     log('[call] Room snapshot — status:', data.status, 'hasOffer:', !!data.offer, 'hasAnswer:', !!data.answer, 'guestJoined:', !!data.guestJoined, 'hostJoined:', !!data.hostJoined);
 
     if (data.status === 'ended') {
-      if (callState === State.CONNECTED || callState === State.CONNECTING) {
-        showToast('أنهى الطرف الآخر المكالمة');
-        endCall(false);
-      }
+      // Remote side (or a reload of this page) ended the room. Close fully on
+      // this side too. ctx.hungUp makes this a no-op if we already hung up.
+      hangup('remote-ended', ctx);
       return;
     }
 
@@ -651,48 +674,13 @@ function copyRoomLink() {
   });
 }
 
-// ── End Call ────────────────────────────────────────────────────
-async function endCall(notifyServer = true) {
-  log('[call] Ending call. Notify server:', notifyServer);
-  setCallState(State.ENDED);
-
-  if (notifyServer && roomId) {
-    const roomRef = doc(db, 'rooms', roomId);
-    await updateDoc(roomRef, {
-      status: 'ended',
-      offer: null,
-      answer: null,
-      hostJoined: false,
-      guestJoined: false,
-      updatedAt: serverTimestamp()
-    }).catch(() => {});
-
-    await clearCandidates();
-  }
-
-  cleanup();
+// ── Ended UI (tourist) ──────────────────────────────────────────
+function endTouristUI(reason) {
+  log('[call] Ended UI. Reason:', reason);
+  setCallState(State.ENDED);   // status 'انتهت المكالمة', hides call controls, shows pre-call controls
   showToast('انتهت المكالمة');
-  setTimeout(() => { window.location.href = 'index.html'; }, 1500);
-}
-
-// ── Cleanup ─────────────────────────────────────────────────────
-function cleanup() {
-  if (unsubRoom) { unsubRoom(); unsubRoom = null; }
-  if (unsubCandidates) { unsubCandidates(); unsubCandidates = null; }
-  if (pc) { pc.close(); pc = null; }
-  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-  if (remoteStream) { remoteStream.getTracks().forEach(t => t.stop()); remoteStream = null; }
-
-  localVideo.srcObject = null;
-  remoteVideo.srcObject = null;
-  localVideo.style.display = 'none';
-  remoteVideo.style.display = 'none';
-  localWaiting.style.display = 'block';
-  remoteWaiting.style.display = 'block';
-
-  callControls.style.display = 'none';
-  preCallControls.style.display = 'flex';
-  captionArea?.classList.remove('visible');
+  // The back-link '← العودة للصفحة الرئيسية' → index.html is already on the page.
+  // No auto-redirect so the user can see 'انتهت المكالمة'.
 }
 
 // ── UI Helpers ──────────────────────────────────────────────────

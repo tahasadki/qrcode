@@ -2,6 +2,7 @@
 // Works together with call.js shared signaling and owner-config.js
 
 import { app } from './firebase-config.js';
+import { hangup } from './signaling.js';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   getFirestore, doc, onSnapshot, updateDoc, collection, query, where, addDoc, deleteDoc, serverTimestamp
@@ -43,6 +44,7 @@ let ownerRemoteDescriptionSet = false;
 let ownerCandidateQueue = [];
 let ownerHasSentAnswer = false;
 let ownerStuckTimer = null;
+let callCtx = null;
 
 // ── Init ───────────────────────────────────────────────────────
 async function initOwner() {
@@ -62,6 +64,37 @@ async function initOwner() {
     });
 
     loginBtn.addEventListener('click', handleLogin);
+
+    // Shared teardown context: proxies the owner page's live call state.
+    callCtx = {
+      hungUp: false,
+      db,
+      get pc() { return ownerPc; },
+      set pc(v) { ownerPc = v; },
+      get localStream() { return ownerLocalStream; },
+      set localStream(v) { ownerLocalStream = v; },
+      get remoteStream() { return ownerRemoteStream; },
+      set remoteStream(v) { ownerRemoteStream = v; },
+      get unsubRoom() { return unsubRoom; },
+      set unsubRoom(v) { unsubRoom = v; },
+      get unsubCandidates() { return unsubCandidates; },
+      set unsubCandidates(v) { unsubCandidates = v; },
+      get roomId() { return currentRoomId; },
+      set roomId(v) { currentRoomId = v; },
+      localVideo: ownerLocalVideo,
+      remoteVideo: ownerRemoteVideo,
+      statusText: ownerStatusText,
+      onEnded(reason) { endOwnerUI(reason); }
+    };
+
+    // End-call button: attached once, after the DOM is ready.
+    if (ownerEndBtn) ownerEndBtn.addEventListener('click', () => hangup('user-ended', callCtx));
+
+    // Event delegation for the waiting-room list (re-rendered on every snapshot).
+    roomsList.addEventListener('click', (e) => {
+      const btn = e.target.closest('.accept-btn');
+      if (btn) acceptCall(btn.dataset.room);
+    });
   } catch (err) {
     console.error('[owner] Init error:', err);
     loginError.textContent = 'فشل في تهيئة النظام';
@@ -172,13 +205,6 @@ function renderWaitingRooms(docs) {
       <button class="accept-btn" data-room="${roomId}">قبول المكالمة</button>
     `;
     roomsList.appendChild(item);
-  });
-
-  document.querySelectorAll('.accept-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const roomId = e.currentTarget.dataset.room;
-      acceptCall(roomId);
-    });
   });
 }
 
@@ -308,7 +334,7 @@ function startOwnerRoomListener() {
     const data = snap.data();
 
     if (data.status === 'ended') {
-      endOwnerCall(false);
+      hangup('remote-ended', callCtx);
       return;
     }
 
@@ -394,40 +420,38 @@ function updateOwnerStatus(state, text) {
   ownerStatusText.textContent = text;
 }
 
-async function endOwnerCall(notifyServer = true) {
+// ── Ended UI (owner) ────────────────────────────────────────────
+function endOwnerUI(reason) {
+  console.log('[owner] Ended UI. Reason:', reason);
   if (ownerStuckTimer) { clearTimeout(ownerStuckTimer); ownerStuckTimer = null; }
-
-  if (notifyServer && currentRoomId && db) {
-    const roomRef = doc(db, 'rooms', currentRoomId);
-    await updateDoc(roomRef, {
-      status: 'ended',
-      updatedAt: serverTimestamp()
-    }).catch(() => {});
-  }
-
-  if (ownerPc) { ownerPc.close(); ownerPc = null; }
-  if (ownerLocalStream) { ownerLocalStream.getTracks().forEach(t => t.stop()); ownerLocalStream = null; }
-  if (ownerRemoteStream) { ownerRemoteStream.getTracks().forEach(t => t.stop()); ownerRemoteStream = null; }
+  updateOwnerStatus('ended', 'انتهت المكالمة');
 
   ownerLocalVideo.srcObject = null;
   ownerRemoteVideo.srcObject = null;
+  ownerLocalVideo.style.display = 'none';
   ownerRemoteVideo.style.display = 'none';
   ownerRemoteWaiting.style.display = 'block';
-  ownerLocalVideo.style.display = 'none';
-  document.getElementById('ownerLocalWaiting').style.display = 'block';
 
-  unsubRoom?.(); unsubRoom = null;
-  unsubCandidates?.(); unsubCandidates = null;
+  const controlsPanel = document.querySelector('.owner-page .controls-panel');
+  const controlRow = controlsPanel && controlsPanel.querySelector('.control-row');
+  if (controlRow) controlRow.style.display = 'none';
 
-  ownerVideoPanel.style.display = 'none';
-  dashboardSection.style.display = 'block';
-  startWaitingRoomsListener();
+  const backBtn = document.createElement('button');
+  backBtn.className = 'ctrl-btn btn-end';
+  backBtn.textContent = 'رجوع لقائمة المكالمات';
+  backBtn.addEventListener('click', () => {
+    backBtn.remove();
+    if (controlRow) controlRow.style.display = 'flex';
+    ownerVideoPanel.style.display = 'none';
+    dashboardSection.style.display = 'block';
+    if (unsubRooms) { unsubRooms(); unsubRooms = null; }
+    startWaitingRoomsListener();
+  });
+  controlsPanel.appendChild(backBtn);
 }
 
 // ── Cleanup on unload ──────────────────────────────────────────
-window.addEventListener('beforeunload', () => {
-  endOwnerCall(false);
-});
+window.addEventListener('pagehide', () => hangup('page-closed', callCtx));
 
 // ── Start ─────────────────────────────────────────────────────
 initOwner();
