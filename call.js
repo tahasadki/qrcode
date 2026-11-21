@@ -281,10 +281,8 @@ async function joinRoom() {
   // Clear stale candidates from previous sessions
   await clearCandidates();
 
-  // Tourist: create offer after room is created (driven by room listener seeing guestJoined)
-  if (myRole === 'tourist' && !hasSentOffer) {
-    await createAndSendOffer();
-  }
+  // Tourist: offer is created by the room listener when guestJoined becomes true.
+  // Do NOT create the offer here — the owner must accept first.
 
   startCandidateListener();
 }

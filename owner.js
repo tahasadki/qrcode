@@ -122,9 +122,10 @@ async function handleLogin(e) {
 // ── Waiting rooms listener ─────────────────────────────────────
 function startWaitingRoomsListener() {
   const roomsRef = collection(db, 'rooms');
-  const q = query(roomsRef, where('status', '==', 'waiting'), where('offer', '!=', null));
+  const q = query(roomsRef, where('status', '==', 'waiting'));
 
   unsubRooms = onSnapshot(q, (snapshot) => {
+    console.log('[owner] Waiting rooms snapshot received:', snapshot.size, 'rooms');
     roomsList.innerHTML = '';
 
     if (snapshot.empty) {
@@ -178,6 +179,15 @@ function showNewCallToast() {
 async function acceptCall(roomId) {
   currentRoomId = roomId;
   ownerHasSentAnswer = false;
+
+  // Mark room as being answered by owner (guestJoined=true, status=connecting)
+  const roomRef = doc(db, 'rooms', roomId);
+  await updateDoc(roomRef, {
+    guestJoined: true,
+    status: 'connecting',
+    updatedAt: serverTimestamp()
+  });
+  console.log('[owner] Marked room', roomId, 'as connecting, guestJoined=true');
 
   // Hide list, show video
   dashboardSection.style.display = 'none';
