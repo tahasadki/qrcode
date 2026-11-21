@@ -1,17 +1,15 @@
 // owner.js — Owner page logic (auth + call answering)
 // Works together with call.js shared signaling and owner-config.js
 
+import { app } from './firebase-config.js';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
-  getFirestore, doc, onSnapshot, updateDoc, collection, query, where, addDoc, deleteDoc, serverTimestamp,
-  initializeApp
+  getFirestore, doc, onSnapshot, updateDoc, collection, query, where, addDoc, deleteDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { OWNER_UID } from './owner-config.js';
 
-const firebaseConfig = window.__FIREBASE_CONFIG__;
-const app = window.__FIREBASE_APP__ || null;
+const db = getFirestore(app);
 let auth = null;
-let db = null;
 let currentRoomId = null;
 let unsubRooms = null;
 let unsubRoom = null;
@@ -49,7 +47,6 @@ let ownerStuckTimer = null;
 // ── Init ───────────────────────────────────────────────────────
 async function initOwner() {
   try {
-    const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
 

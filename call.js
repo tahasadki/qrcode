@@ -15,7 +15,7 @@
 // State machine: waiting -> connecting -> connected
 // ============================================================
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { app } from './firebase-config.js';
 import {
   getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc,
   collection, addDoc, deleteDoc, serverTimestamp, getDocs, runTransaction
@@ -25,13 +25,6 @@ import {
 const PAGE_TYPE = window.__PAGE_TYPE__ || 'tourist';
 
 // ── Firebase config (single source: firebase-config.js) ─────────
-const firebaseConfig = window.__FIREBASE_CONFIG__;
-
-if (!firebaseConfig) {
-  console.error('[call.js] Firebase config not found — load firebase-config.js before call.js');
-}
-
-const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // ── TURN credentials ────────────────────────────────────────────
