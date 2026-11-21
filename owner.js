@@ -135,32 +135,50 @@ function startWaitingRoomsListener() {
     }
 
     noCallsMsg.style.display = 'none';
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const roomId = docSnap.id;
-      const createdAt = data.createdAt ? new Date(data.createdAt.toDate ? data.createdAt.toDate() : data.createdAt).toLocaleTimeString('ar-MA') : '';
 
-      const item = document.createElement('div');
-      item.className = 'room-item';
-      item.innerHTML = `
-        <div class="room-info">
-          <div class="room-id">${roomId}</div>
-          <div class="room-time">أنشئت: ${createdAt}</div>
-        </div>
-        <button class="accept-btn" data-room="${roomId}">قبول المكالمة</button>
-      `;
-      roomsList.appendChild(item);
+    // Sort docs by createdAt descending; missing createdAt goes to bottom
+    const docs = snapshot.docs.sort((a, b) => {
+      const aTime = a.data().createdAt ? a.data().createdAt.toDate ? a.data().createdAt.toDate() : new Date(a.data().createdAt) : null;
+      const bTime = b.data().createdAt ? b.data().createdAt.toDate ? b.data().createdAt.toDate() : new Date(b.data().createdAt) : null;
+      if (!aTime && !bTime) return 0;
+      if (!aTime) return 1;
+      if (!bTime) return -1;
+      return bTime - aTime;
     });
 
-    document.querySelectorAll('.accept-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const roomId = e.currentTarget.dataset.room;
-        acceptCall(roomId);
-      });
-    });
+    renderWaitingRooms(docs);
 
     // Visual alert when new room appears
     showNewCallToast();
+  });
+}
+
+function renderWaitingRooms(docs) {
+  docs.forEach((docSnap) => {
+    const data = docSnap.data();
+    const roomId = docSnap.id;
+
+    if (data.status && data.status !== 'waiting') return;
+
+    const createdAt = data.createdAt ? new Date(data.createdAt.toDate ? data.createdAt.toDate() : data.createdAt).toLocaleTimeString('ar-MA') : '';
+
+    const item = document.createElement('div');
+    item.className = 'room-item';
+    item.innerHTML = `
+      <div class="room-info">
+        <div class="room-id">${roomId}</div>
+        <div class="room-time">أنشئت: ${createdAt}</div>
+      </div>
+      <button class="accept-btn" data-room="${roomId}">قبول المكالمة</button>
+    `;
+    roomsList.appendChild(item);
+  });
+
+  document.querySelectorAll('.accept-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const roomId = e.currentTarget.dataset.room;
+      acceptCall(roomId);
+    });
   });
 }
 
@@ -177,24 +195,27 @@ function showNewCallToast() {
 
 // ── Accept call ────────────────────────────────────────────────
 async function acceptCall(roomId) {
-  currentRoomId = roomId;
-  ownerHasSentAnswer = false;
+  console.log('[owner] accept clicked', roomId);
 
-  // Mark room as being answered by owner (guestJoined=true, status=connecting)
-  const roomRef = doc(db, 'rooms', roomId);
-  await updateDoc(roomRef, {
-    guestJoined: true,
-    status: 'connecting',
-    updatedAt: serverTimestamp()
-  });
-  console.log('[owner] Marked room', roomId, 'as connecting, guestJoined=true');
+  try {
+    currentRoomId = roomId;
+    ownerHasSentAnswer = false;
 
-  // Hide list, show video
-  dashboardSection.style.display = 'none';
-  ownerVideoPanel.style.display = 'block';
-  ownerRemoteWaiting.style.display = 'block';
-  ownerRemoteVideo.style.display = 'none';
-  updateOwnerStatus('waiting', 'جاري الرد على المكالمة…');
+    // Mark room as being answered by owner (guestJoined=true, status=connecting)
+    const roomRef = doc(db, 'rooms', roomId);
+    await updateDoc(roomRef, {
+      guestJoined: true,
+      status: 'connecting',
+      updatedAt: serverTimestamp()
+    });
+    console.log('[owner] Marked room', roomId, 'as connecting, guestJoined=true');
+
+    // Hide list, show video
+    dashboardSection.style.display = 'none';
+    ownerVideoPanel.style.display = 'block';
+    ownerRemoteWaiting.style.display = 'block';
+    ownerRemoteVideo.style.display = 'none';
+    updateOwnerStatus('waiting', 'جاري الرد على المكالمة…');
 
   try {
     ownerLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
@@ -210,6 +231,9 @@ async function acceptCall(roomId) {
   createOwnerPeerConnection();
   startOwnerRoomListener();
   startOwnerCandidateListener();
+  } catch (err) {
+    console.error('[owner] accept error:', err.message);
+  }
 }
 
 async function createOwnerPeerConnection() {
