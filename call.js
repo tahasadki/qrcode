@@ -1,18 +1,18 @@
 // ============================================================
-// call.js — WebRTC Video Call with Firestore Signaling
+// call.js — WebRTC Video Call with Firestore Signaling (Tourist page)
+//
+// Role: tourist (creates room + offer, waits for answer, then ICE)
 //
 // Signaling flow:
-//   1. joinRoom() — atomically claim role (host=create offer, guest=answer)
-//   2. Host creates offer OUTSIDE transaction, writes to Firestore
-//   3. Guest reads offer, creates answer, writes to Firestore
-//   4. Host reads answer, sets remote description
-//   5. ICE candidates exchanged via rooms/{id}/candidates subcollection
-//      - Each doc: { role, candidate, createdAt }
-//      - Own candidates ignored; remote candidates queued until
-//        setRemoteDescription completes, then flushed.
-//   6. ICE connected → call connected
+//   1. Tourist creates room with status "waiting", guestJoined=false
+//   2. Tourist creates offer, writes offer to rooms/{roomId}
+//   3. Owner answers: setRemoteDescription(offer), createAnswer, writes answer
+//   4. ICE candidates exchanged via rooms/{id}/candidates subcollection
+//      - Each doc: { from, candidate, createdAt }
+//      - Ignore own candidates; buffer until remoteDescription set.
+//   5. ICE connected → call connected
 //
-// State machine: IDLE → WAITING → CONNECTING → CONNECTED / FAILED / ENDED
+// State machine: waiting -> connecting -> connected
 // ============================================================
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -20,6 +20,9 @@ import {
   getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc,
   collection, addDoc, deleteDoc, serverTimestamp, getDocs, runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── Page type (tourist | owner) ─────────────────────────────────
+const PAGE_TYPE = window.__PAGE_TYPE__ || 'tourist';
 
 // ── Firebase config (single source: firebase-config.js) ─────────
 const firebaseConfig = window.__FIREBASE_CONFIG__;
@@ -32,8 +35,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // ── TURN credentials ────────────────────────────────────────────
-// Fetched from Vercel serverless endpoint (/api/turn) before creating the PC.
-// Falls back to <meta> tags or window.__TURN_*__ globals.
 let turnCredentials = null;
 let stuckTimer = null;
 
@@ -50,26 +51,25 @@ async function fetchTurnCredentials() {
           username: turnServer.username,
           credential: turnServer.credential
         };
-        log('TURN credentials fetched from /api/turn');
+        log('[call] TURN credentials fetched from /api/turn');
         return;
       }
     }
   } catch (err) {
-    log('TURN endpoint unavailable:', err.message);
+    log('[call] TURN endpoint unavailable:', err.message);
   }
 
-  // Fallback: meta tags or globals
   const turnUrl = getMeta('turn-url') || window.__TURN_URL__;
   const turnUser = getMeta('turn-username') || window.__TURN_USERNAME__;
   const turnCred = getMeta('turn-credential') || window.__TURN_CREDENTIAL__;
 
   if (turnUrl && turnUser && turnCred) {
     turnCredentials = { url: turnUrl, username: turnUser, credential: turnCred };
-    log('TURN credentials from meta tags / globals');
+    log('[call] TURN credentials from meta tags / globals');
     return;
   }
 
-  log('No TURN credentials available — STUN only');
+  log('[call] No TURN credentials available — STUN only');
   turnCredentials = null;
 }
 
@@ -90,9 +90,9 @@ function buildIceServers() {
       username: turnCredentials.username,
       credential: turnCredentials.credential
     });
-    log('TURN server configured');
+    log('[call] TURN server configured');
   } else {
-    log('No TURN server — STUN only (may fail on 4G/strict NAT)');
+    log('[call] No TURN server — STUN only (may fail on 4G/strict NAT)');
   }
 
   return servers;
@@ -119,7 +119,7 @@ const retryBtn = document.getElementById('retryBtn');
 
 // ── State ───────────────────────────────────────────────────────
 let roomId = null;
-let myRole = null;           // "host" | "guest"
+let myRole = PAGE_TYPE;           // "tourist" | "owner"
 let pc = null;
 let localStream = null;
 let remoteStream = null;
@@ -130,22 +130,21 @@ let cameraOff = false;
 
 let remoteDescriptionSet = false;
 let candidateQueue = [];
+let hasSentOffer = false;
+let hasSentAnswer = false;
 
 const State = {
-  IDLE: 'idle',
   WAITING: 'waiting',
-  PEER_JOINED: 'peer-joined',
   CONNECTING: 'connecting',
-  ICE_CHECKING: 'ice-checking',
   CONNECTED: 'connected',
   FAILED: 'failed',
   ENDED: 'ended'
 };
-let callState = State.IDLE;
+let callState = State.WAITING;
 
 // ── Logging ─────────────────────────────────────────────────────
 function log(...args) {
-  console.log('[call.js]', ...args);
+  console.log('[call]', ...args);
 }
 
 // ── Room ID ─────────────────────────────────────────────────────
@@ -168,6 +167,9 @@ async function init() {
   roomBadge.textContent = `الغرفة: ${roomId}`;
   roomIdDisplay.textContent = roomId;
 
+  // Attach room listener BEFORE claiming role
+  startRoomListener();
+
   // Fetch TURN credentials before anything else
   turnCredentials = await fetchTurnCredentials();
 
@@ -176,8 +178,8 @@ async function init() {
 
   // Stuck-state timeout: if still waiting after 60s, show message and end room
   stuckTimer = setTimeout(() => {
-    if (callState === State.WAITING || callState === State.PEER_JOINED) {
-      log('Stuck timeout: no peer joined within 60s');
+    if (callState === State.WAITING) {
+      log('[call] Stuck timeout: no peer joined within 60s');
       updateStatus('failed', '❌ تأخر الاتصال — لم ينضم طرف ثاني');
       showRetryButton();
     }
@@ -203,26 +205,25 @@ async function setupLocalStream() {
     localVideo.style.display = 'block';
     localWaiting.style.display = 'none';
     showToast('تم الوصول للكاميرا والميكروفون');
-    log('Local media acquired');
+    log('[call] Local media acquired');
   } catch (err) {
-    console.error('Media access error:', err);
+    console.error('[call] Media access error:', err);
     localWaiting.innerHTML = '<div class="icon">⚠️</div><span>تعذر الوصول للكاميرا/الميكروفون</span>';
     showToast('تعذر الوصول للكاميرا أو الميكروفون: ' + err.message);
   }
 }
 
-// ── Join room (role claiming) ───────────────────────────────────
+// ── Join room (tourist creates room) ────────────────────────────
 async function joinRoom() {
   const roomRef = doc(db, 'rooms', roomId);
-  let existingData = null;
 
   try {
     await runTransaction(db, async (transaction) => {
       const roomSnap = await transaction.get(roomRef);
 
       if (!roomSnap.exists()) {
-        // First participant — create room, become host
-        myRole = 'host';
+        // Tourist creates room with status "waiting", guestJoined=false
+        myRole = 'tourist';
         transaction.set(roomRef, {
           status: 'waiting',
           hostJoined: true,
@@ -232,14 +233,14 @@ async function joinRoom() {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
-        log('Created room as HOST');
+        log('[call] Created room as TOURIST');
       } else {
-        existingData = roomSnap.data();
-        const { status, hostJoined, guestJoined } = existingData;
+        const data = roomSnap.data();
+        const { status, hostJoined, guestJoined } = data;
 
         if (status === 'ended' || (!hostJoined && !guestJoined)) {
-          // Room ended or empty — reclaim as host
-          myRole = 'host';
+          // Room ended or empty — reclaim as tourist
+          myRole = 'tourist';
           transaction.update(roomRef, {
             status: 'waiting',
             hostJoined: true,
@@ -248,65 +249,50 @@ async function joinRoom() {
             answer: null,
             updatedAt: serverTimestamp()
           });
-          log('Reclaimed ended/empty room as HOST');
+          log('[call] Reclaimed ended/empty room as TOURIST');
         } else if (hostJoined && !guestJoined) {
-          // Host present, guest slot free — become guest
-          myRole = 'guest';
+          // Tourist present, owner slot free — become owner
+          myRole = 'owner';
           transaction.update(roomRef, {
             guestJoined: true,
             updatedAt: serverTimestamp()
           });
-          log('Joined room as GUEST');
+          log('[call] Joined room as OWNER');
         } else if (!hostJoined && guestJoined) {
-          // Guest present, host slot free — become host
-          myRole = 'host';
+          // Owner present, tourist slot free — become tourist
+          myRole = 'tourist';
           transaction.update(roomRef, {
             hostJoined: true,
             updatedAt: serverTimestamp()
           });
-          log('Joined room as HOST (guest was waiting)');
+          log('[call] Joined room as TOURIST (owner was waiting)');
         } else {
-          // Both slots taken — refresh mid-call scenario.
-          // Don't reset offer/answer; try to infer role from signaling state.
-          if (existingData.offer && !existingData.answer) {
-            myRole = 'host';
-            transaction.update(roomRef, {
-              hostJoined: true,
-              updatedAt: serverTimestamp()
-            });
-            log('Rejoined as HOST (offer present, no answer)');
-          } else {
-            myRole = 'guest';
-            transaction.update(roomRef, {
-              guestJoined: true,
-              updatedAt: serverTimestamp()
-            });
-            log('Rejoined as GUEST (both slots taken)');
-          }
+          // Both slots taken — refresh mid-call scenario
+          myRole = 'owner';
+          transaction.update(roomRef, {
+            guestJoined: true,
+            updatedAt: serverTimestamp()
+          });
+          log('[call] Rejoined as OWNER (both slots taken)');
         }
       }
     });
   } catch (err) {
-    console.error('Failed to join room:', err);
+    console.error('[call] Failed to join room:', err);
     showToast('فشل الانضمام للغرفة');
     return;
   }
 
-  log('My role:', myRole, '| existing offer:', !!existingData?.offer, '| existing answer:', !!existingData?.answer);
-  setCallState(State.WAITING);
+  log('[call] My role:', myRole);
 
   // Clear stale candidates from previous sessions
   await clearCandidates();
 
-  // Host: create offer outside the transaction
-  if (myRole === 'host') {
+  // Tourist: create offer after room is created (driven by room listener seeing guestJoined)
+  if (myRole === 'tourist' && !hasSentOffer) {
     await createAndSendOffer();
-  } else if (existingData?.offer && !remoteDescriptionSet) {
-    // Guest rejoining mid-call with an existing offer — handle it
-    await handleOffer(existingData.offer);
   }
 
-  startRoomListener();
   startCandidateListener();
 }
 
@@ -317,16 +303,16 @@ async function clearCandidates() {
     const snap = await getDocs(candidatesRef);
     const deletes = snap.docs.map(d => deleteDoc(d.ref));
     await Promise.all(deletes);
-    log('Cleared', snap.size, 'stale candidates');
+    log('[call] Cleared', snap.size, 'stale candidates');
   } catch (err) {
-    console.warn('Failed to clear candidates:', err);
+    console.warn('[call] Failed to clear candidates:', err);
   }
 }
 
 // ── Peer Connection ─────────────────────────────────────────────
 function createPeerConnection() {
   if (pc) {
-    log('Closing previous RTCPeerConnection');
+    log('[call] Closing previous RTCPeerConnection');
     pc.close();
     pc = null;
   }
@@ -336,7 +322,7 @@ function createPeerConnection() {
 
   const iceServers = buildIceServers();
   pc = new RTCPeerConnection({ iceServers });
-  log('Created new RTCPeerConnection');
+  log('[call] Created new RTCPeerConnection');
 
   if (localStream) {
     localStream.getTracks().forEach(track => {
@@ -350,7 +336,7 @@ function createPeerConnection() {
       remoteVideo.srcObject = remoteStream;
       remoteVideo.style.display = 'block';
       remoteWaiting.style.display = 'none';
-      log('Remote track received');
+      log('[call] Remote track received');
     }
   };
 
@@ -362,11 +348,11 @@ function createPeerConnection() {
 
   pc.oniceconnectionstatechange = () => {
     const state = pc.iceConnectionState;
-    log('ICE connection state:', state);
+    log('[call] ICE connection state:', state);
     connStateDisplay.textContent = state;
 
     if (state === 'checking') {
-      setCallState(State.ICE_CHECKING);
+      setCallState(State.CONNECTING);
     } else if (state === 'connected' || state === 'completed') {
       setCallState(State.CONNECTED);
     } else if (state === 'disconnected') {
@@ -378,7 +364,7 @@ function createPeerConnection() {
   };
 
   pc.onconnectionstatechange = () => {
-    log('Connection state:', pc.connectionState);
+    log('[call] Connection state:', pc.connectionState);
     if (pc.connectionState === 'failed') {
       setCallState(State.FAILED);
     }
@@ -387,44 +373,49 @@ function createPeerConnection() {
   return pc;
 }
 
-// ── Create Offer (host) ─────────────────────────────────────────
+// ── Create Offer (tourist) ──────────────────────────────────────
 async function createAndSendOffer() {
-  log('Creating offer...');
+  if (hasSentOffer) return;
+  hasSentOffer = true;
+
+  log('[call] Creating offer...');
   setCallState(State.WAITING);
 
   createPeerConnection();
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  log('Local description set (offer)');
+  log('[call] Local description set (offer)');
 
   const roomRef = doc(db, 'rooms', roomId);
   await updateDoc(roomRef, {
     offer: offer.toJSON(),
     answer: null,
-    status: 'waiting',
+    status: 'connecting',
     updatedAt: serverTimestamp()
   });
 
-  updateStatus('waiting', 'في انتظار الطرف الآخر…');
-  log('Offer sent to Firestore');
+  updateStatus('connecting', 'جاري الاتصال…');
+  log('[call] Offer sent to Firestore, status=connecting');
 }
 
-// ── Handle Offer (guest) ────────────────────────────────────────
+// ── Handle Offer (owner) ────────────────────────────────────────
 async function handleOffer(offer) {
-  log('Handling offer...');
+  if (hasSentAnswer) return;
+
+  log('[call] Handling offer...');
   setCallState(State.CONNECTING);
   updateStatus('connecting', 'جاري الاتصال…');
 
   createPeerConnection();
   await pc.setRemoteDescription(new RTCSessionDescription(offer));
   remoteDescriptionSet = true;
-  log('Remote description set (offer)');
+  log('[call] Remote description set (offer)');
 
   flushCandidateQueue();
 
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
-  log('Local description set (answer)');
+  log('[call] Local description set (answer)');
 
   const roomRef = doc(db, 'rooms', roomId);
   await updateDoc(roomRef, {
@@ -433,23 +424,23 @@ async function handleOffer(offer) {
     updatedAt: serverTimestamp()
   });
 
-  log('Answer sent to Firestore');
+  log('[call] Answer sent to Firestore, status=connected');
 }
 
-// ── Handle Answer (host) ────────────────────────────────────────
+// ── Handle Answer (tourist) ─────────────────────────────────────
 async function handleAnswer(answer) {
   if (!pc || pc.signalingState !== 'have-local-offer') {
-    log('Ignoring answer — wrong signaling state:', pc?.signalingState);
+    log('[call] Ignoring answer — wrong signaling state:', pc?.signalingState);
     return;
   }
 
-  log('Handling answer...');
+  log('[call] Handling answer...');
   setCallState(State.CONNECTING);
   updateStatus('connecting', 'جاري الاتصال…');
 
   await pc.setRemoteDescription(new RTCSessionDescription(answer));
   remoteDescriptionSet = true;
-  log('Remote description set (answer)');
+  log('[call] Remote description set (answer)');
 
   flushCandidateQueue();
 }
@@ -458,7 +449,7 @@ async function handleAnswer(answer) {
 async function sendIceCandidate(candidate) {
   const candidatesRef = collection(db, 'rooms', roomId, 'candidates');
   await addDoc(candidatesRef, {
-    role: myRole,
+    from: myRole,
     candidate: candidate.toJSON(),
     createdAt: serverTimestamp()
   });
@@ -466,7 +457,7 @@ async function sendIceCandidate(candidate) {
 
 function handleRemoteCandidate(candidateData) {
   // Ignore our own candidates
-  if (candidateData.role === myRole) {
+  if (candidateData.from === myRole) {
     return;
   }
 
@@ -474,36 +465,36 @@ function handleRemoteCandidate(candidateData) {
 
   if (remoteDescriptionSet && pc) {
     pc.addIceCandidate(candidate).catch(err => {
-      console.warn('Failed to add ICE candidate:', err);
+      console.warn('[call] Failed to add ICE candidate:', err);
     });
   } else {
     candidateQueue.push(candidate);
-    log('Queued ICE candidate (remote desc not set yet). Queue size:', candidateQueue.length);
+    log('[call] Queued ICE candidate (remote desc not set yet). Queue size:', candidateQueue.length);
   }
 }
 
 function flushCandidateQueue() {
   if (!pc || candidateQueue.length === 0) return;
-  log('Flushing', candidateQueue.length, 'queued ICE candidates');
+  log('[call] Flushing', candidateQueue.length, 'queued ICE candidates');
   for (const candidate of candidateQueue) {
     pc.addIceCandidate(candidate).catch(err => {
-      console.warn('Failed to add queued ICE candidate:', err);
+      console.warn('[call] Failed to add queued ICE candidate:', err);
     });
   }
   candidateQueue = [];
 }
 
-// ── Room Listener ───────────────────────────────────────────────
+// ── Room Listener (drives the state machine) ────────────────────
 function startRoomListener() {
   const roomRef = doc(db, 'rooms', roomId);
 
   unsubRoom = onSnapshot(roomRef, async (snap) => {
     if (!snap.exists()) {
-      log('Room deleted');
+      log('[call] Room deleted');
       return;
     }
     const data = snap.data();
-    log('Room snapshot — status:', data.status, 'hasOffer:', !!data.offer, 'hasAnswer:', !!data.answer);
+    log('[call] Room snapshot — status:', data.status, 'hasOffer:', !!data.offer, 'hasAnswer:', !!data.answer, 'guestJoined:', !!data.guestJoined, 'hostJoined:', !!data.hostJoined);
 
     if (data.status === 'ended') {
       if (callState === State.CONNECTED || callState === State.CONNECTING) {
@@ -513,30 +504,29 @@ function startRoomListener() {
       return;
     }
 
-    // Guest: handle offer if not yet processed
-    if (myRole === 'guest' && data.offer && !remoteDescriptionSet && callState !== State.CONNECTING) {
-      await handleOffer(data.offer);
+    // Tourist: guest joined and no offer yet → create offer
+    if (myRole === 'tourist' && data.guestJoined && !data.offer && !hasSentOffer) {
+      await createAndSendOffer();
       return;
     }
 
-    // Host: handle answer if waiting for it
-    if (myRole === 'host' && data.answer && pc && pc.signalingState === 'have-local-offer') {
+    // Tourist: answer appeared and we're waiting for it
+    if (myRole === 'tourist' && data.answer && !remoteDescriptionSet && pc && pc.signalingState === 'have-local-offer') {
       await handleAnswer(data.answer);
       return;
     }
 
-    // Peer joined (room went from waiting to having both participants)
-    if (data.hostJoined && data.guestJoined && callState === State.WAITING) {
-      setCallState(State.PEER_JOINED);
-      updateStatus('peer-joined', 'انضم الطرف الآخر…');
-      log('Peer joined');
+    // Owner: offer appeared and no answer yet → create answer
+    if (myRole === 'owner' && data.offer && !data.answer && !hasSentAnswer && !remoteDescriptionSet) {
+      await handleOffer(data.offer);
+      return;
     }
 
     // Other party left (room reset to waiting while we're connected)
     if (data.status === 'waiting' && callState === State.CONNECTED) {
-      log('Other party left — resetting for new connection');
+      log('[call] Other party left — resetting for new connection');
       resetForNewCall();
-      if (myRole === 'host') {
+      if (myRole === 'tourist') {
         await clearCandidates();
         await createAndSendOffer();
       }
@@ -559,7 +549,7 @@ function startCandidateListener() {
 
 // ── State Machine ───────────────────────────────────────────────
 function setCallState(newState) {
-  log('State:', callState, '→', newState);
+  log('[call] State:', callState, '→', newState);
   callState = newState;
 
   switch (newState) {
@@ -570,18 +560,8 @@ function setCallState(newState) {
       hideRetryButton();
       break;
 
-    case State.PEER_JOINED:
-      updateStatus('peer-joined', 'انضم الطرف الآخر — جاري إنشاء الاتصال…');
-      hideRetryButton();
-      break;
-
     case State.CONNECTING:
       updateStatus('connecting', 'جاري الاتصال…');
-      hideRetryButton();
-      break;
-
-    case State.ICE_CHECKING:
-      updateStatus('ice-checking', 'جاري فحص المسار…');
       hideRetryButton();
       break;
 
@@ -620,7 +600,7 @@ function hideRetryButton() {
 
 // ── Retry ───────────────────────────────────────────────────────
 async function retryCall() {
-  log('Retrying call...');
+  log('[call] Retrying call...');
   resetForNewCall();
   await clearCandidates();
 
@@ -632,7 +612,7 @@ async function retryCall() {
     updatedAt: serverTimestamp()
   });
 
-  if (myRole === 'host') {
+  if (myRole === 'tourist') {
     await createAndSendOffer();
   } else {
     setCallState(State.WAITING);
@@ -645,6 +625,8 @@ function resetForNewCall() {
   if (pc) { pc.close(); pc = null; }
   remoteDescriptionSet = false;
   candidateQueue = [];
+  hasSentOffer = false;
+  hasSentAnswer = false;
   remoteVideo.style.display = 'none';
   remoteWaiting.style.display = 'block';
   captionArea?.classList.remove('visible');
@@ -680,7 +662,7 @@ function copyRoomLink() {
 
 // ── End Call ────────────────────────────────────────────────────
 async function endCall(notifyServer = true) {
-  log('Ending call. Notify server:', notifyServer);
+  log('[call] Ending call. Notify server:', notifyServer);
   setCallState(State.ENDED);
 
   if (notifyServer && roomId) {

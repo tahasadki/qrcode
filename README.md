@@ -126,6 +126,37 @@ Features in `host.html` that depend on `server.js`:
 The `call.html` page does **not** depend on `server.js` — it uses
 Firestore for all signaling and works on Vercel as-is.
 
+## Owner Page (owner.html)
+
+The owner page (`owner.html`) is a separate dashboard protected by
+Firebase Auth. It lists waiting calls and lets the owner answer one.
+
+### Owner Login
+
+1. Open `owner.html`
+2. Enter email and password (Firebase Auth via `signInWithEmailAndPassword`)
+3. The page checks the user's UID against `OWNER_UID` in `owner-config.js`
+4. If UID does not match, the user is signed out with message "غير مسموح"
+
+### Setting OWNER_UID
+
+Edit `owner-config.js` and replace the placeholder:
+
+```javascript
+export const OWNER_UID = 'REPLACE_WITH_OWNER_UID';
+```
+
+Set this to the Firebase Auth UID of the authorized owner. Get the UID
+from [Firebase Console → Authentication → Users](https://console.firebase.google.com/project/riad-265a5/authentication/users).
+
+### Owner Flow
+
+1. Owner logs in and sees a live list of waiting rooms
+2. Each room has a "قبول المكالمة" (Answer Call) button
+3. Clicking accept joins the room, creates an answer, writes it to
+   Firestore, and connects the video call
+4. When no calls are waiting, shows "ما كاين حتى مكالمة دابا"
+
 ## How Translation Works
 
 1. **Tourist** selects language and initiates a call (audio/video).
