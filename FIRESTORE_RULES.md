@@ -29,7 +29,8 @@ service cloud.firestore {
       // Allow creating candidates during connection
       allow create: if get(/databases/$(database)/documents/rooms/$(roomId)).data.status != 'ended';
       
-      // No update/delete needed for candidates
+      // Allow deleting stale candidates on new call setup
+      allow delete: if true;
     }
   }
 }
@@ -61,6 +62,7 @@ firebase deploy --only firestore:rules
 | `rooms` | `delete` | Anyone (to clean up ended calls) |
 | `rooms/{roomId}/candidates` | `read` | Parent room not ended |
 | `rooms/{roomId}/candidates` | `create` | Parent room not ended |
+| `rooms/{roomId}/candidates` | `delete` | Anyone (to clear stale candidates) |
 
 ## Notes
 

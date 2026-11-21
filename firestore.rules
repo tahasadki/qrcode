@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ── Video call rooms ────────────────────────────────────────
+    match /rooms/{roomId} {
+      // Read allowed for any existing room
+      allow read: if true;
+
+      // Create only with initial status "waiting"
+      allow create: if request.resource.data.status == 'waiting';
+
+      // Update only if the room is not already ended
+      allow update: if resource.data.status != 'ended';
+
+      // Delete only after the call has ended
+      allow delete: if resource.data.status == 'ended';
+    }
+
+    // ── ICE candidates subcollection ────────────────────────────
+    match /rooms/{roomId}/candidates/{candidateId} {
+      // Read, create allowed while parent room is not ended
+      allow read, create: if get(/databases/$(database)/documents/rooms/$(roomId)).data.status != 'ended';
+      // Delete allowed anytime (cleanup of stale candidates)
+      allow delete: if true;
+
+      // No updates allowed on candidate docs
+      allow update: if false;
+    }
+  }
+}

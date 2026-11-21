@@ -1,7 +1,8 @@
 // Firebase Client Configuration
-// Real config from Firebase Console for project: riad-265a5
+// Single source of truth for the Firebase config (project: riad-265a5).
+// All pages load this file. Do NOT duplicate this config elsewhere.
 
-export const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyA7vRgiNvVbn55o4A0nNNqPyr7UpGSQ39E",
   authDomain: "riad-265a5.firebaseapp.com",
   projectId: "riad-265a5",
@@ -10,7 +11,12 @@ export const firebaseConfig = {
   appId: "1:745898895809:web:68f7dece8dad691187e740"
 };
 
-// For client-side use in browser
+// Make config available to ES module scripts (e.g. call.js)
+// and to classic scripts on the page.
 if (typeof window !== 'undefined') {
   window.__FIREBASE_CONFIG__ = firebaseConfig;
 }
+
+// Note: the 'export' keyword was removed so this file can be loaded
+// as a classic <script> (without type="module") across all pages.
+// call.js reads window.__FIREBASE_CONFIG__ as the primary source.
