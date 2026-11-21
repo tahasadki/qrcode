@@ -415,9 +415,33 @@ async function sendOwnerIceCandidate(candidate) {
   });
 }
 
+const missingLogged = new Set();
+
+function setStatus(el, text, id) {
+  if (!el) {
+    if (id && !missingLogged.has(id)) {
+      missingLogged.add(id);
+      console.log('[owner] missing element:', id);
+    }
+    return;
+  }
+  el.textContent = text;
+}
+
+function setClass(el, className, id) {
+  if (!el) {
+    if (id && !missingLogged.has(id)) {
+      missingLogged.add(id);
+      console.log('[owner] missing element:', id);
+    }
+    return;
+  }
+  el.className = className;
+}
+
 function updateOwnerStatus(state, text) {
-  ownerStatus.className = 'status-row ' + state;
-  ownerStatusText.textContent = text;
+  setClass(ownerStatus, 'status-row ' + state, 'ownerStatus');
+  setStatus(ownerStatusText, text, 'ownerStatusText');
 }
 
 // ── Ended UI (owner) ────────────────────────────────────────────
