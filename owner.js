@@ -8,7 +8,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { OWNER_UID } from './owner-config.js';
 
-const db = getFirestore(app);
+let db = getFirestore(app);
 let auth = null;
 let currentRoomId = null;
 let unsubRooms = null;
